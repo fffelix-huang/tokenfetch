@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Manual dry run from the Actions tab: builds everything, publishes nothing.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # goreleaser needs tags and history
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - name: verify version matches tag
+        if: github.event_name == 'push'
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          grep -qF "var version = \"$v\"" cmd/tokenfetch/main.go || {
+            echo "cmd/tokenfetch/main.go version does not match tag $GITHUB_REF_NAME"; exit 1; }
+      - name: test
+        run: go test ./...
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: >-
+            ${{ github.event_name == 'push'
+                && 'release --clean'
+                || 'release --snapshot --clean --skip=publish' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  homebrew:
+    needs: release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: render formula
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          sha=$(curl -fsSL "$url" | sha256sum | cut -d' ' -f1)
+          sed -e "s|@VERSION@|${GITHUB_REF_NAME#v}|g" -e "s|@SHA256@|$sha|g" \
+            .github/homebrew/tokenfetch.rb |
+            awk 'body || !/^#/ { body = 1; print }' > "$RUNNER_TEMP/tokenfetch.rb"
+          cat "$RUNNER_TEMP/tokenfetch.rb"
+      - uses: actions/checkout@v7
+        with:
+          repository: fffelix-huang/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - name: push formula to tap
+        working-directory: tap
+        run: |
+          cp "$RUNNER_TEMP/tokenfetch.rb" Formula/tokenfetch.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/tokenfetch.rb
+          git diff --cached --quiet || git commit -m "tokenfetch ${GITHUB_REF_NAME#v}"
+          git push

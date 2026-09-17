@@ -1,0 +1,46 @@
+version: 2
+project_name: tokenfetch
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: tokenfetch
+    main: ./cmd/tokenfetch
+    binary: tokenfetch
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.revision={{ .ShortCommit }}
+
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}_{{ .Arch }}"
+    ids:
+      - tokenfetch
+    formats:
+      - tar.gz
+
+release:
+  github:
+    owner: fffelix-huang
+    name: tokenfetch
+  prerelease: auto
+  name_template: '{{ .Version }}'
+
+snapshot:
+  version_template: "{{ .Version }}-devel"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - README
