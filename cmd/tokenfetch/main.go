@@ -44,10 +44,10 @@ Range (pick one):
   --today     since local midnight
 
 Flags:
-  --json      print the report as JSON
-  --rebuild   re-read all logs; history of already-deleted logs is kept
-  --version   print version
-  -h, --help  show this help
+  --json          print the report as JSON
+  --rebuild       re-read all logs; history of already-deleted logs is kept
+  -v, --version   print version
+  -h, --help      show this help
 
 Environment:
   TOKENFETCH_DATA_DIR  where usage history is stored
@@ -59,13 +59,14 @@ Environment:
 
 func run() error {
 	var (
-		today   = flag.Bool("today", false, "")
-		week    = flag.Bool("week", false, "")
-		month   = flag.Bool("month", false, "")
-		all     = flag.Bool("all", false, "")
-		asJSON  = flag.Bool("json", false, "")
-		rebuild = flag.Bool("rebuild", false, "")
-		showVer = flag.Bool("version", false, "")
+		today        = flag.Bool("today", false, "")
+		week         = flag.Bool("week", false, "")
+		month        = flag.Bool("month", false, "")
+		all          = flag.Bool("all", false, "")
+		asJSON       = flag.Bool("json", false, "")
+		rebuild      = flag.Bool("rebuild", false, "")
+		showVer      = flag.Bool("version", false, "")
+		showVerShort = flag.Bool("v", false, "")
 	)
 	flag.Usage = func() {
 		dir, err := store.DefaultDataDir()
@@ -80,7 +81,7 @@ func run() error {
 		fmt.Fprintf(flag.CommandLine.Output(), usageText, dir)
 	}
 	flag.Parse()
-	if *showVer {
+	if *showVer || *showVerShort {
 		if len(revision) > 0 {
 			fmt.Printf("%s (%s)\n", version, revision)
 		} else {
