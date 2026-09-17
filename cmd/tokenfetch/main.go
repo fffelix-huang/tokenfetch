@@ -23,7 +23,7 @@ import (
 
 // Bump version by hand for each release; the release workflow checks it
 // matches the tag. Release builds override both via -ldflags -X.
-var version = "0.1.0"
+var version = "0.2.0"
 var revision = "devel"
 
 func main() {
