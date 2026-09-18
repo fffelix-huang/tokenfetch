@@ -1,7 +1,7 @@
 # Template for fffelix-huang/homebrew-tap Formula/tokenfetch.rb.
 # The release workflow fills in @VERSION@ and @SHA256@ and pushes it to the tap.
 class Tokenfetch < Formula
-  desc "Fetch-style summary of Claude Code token usage and cost"
+  desc "Tokenfetch gives summary of Claude Code token usage and estimated API cost."
   homepage "https://github.com/fffelix-huang/tokenfetch"
   url "https://github.com/fffelix-huang/tokenfetch/archive/refs/tags/v@VERSION@.tar.gz"
   sha256 "@SHA256@"
