@@ -1,4 +1,4 @@
-# tokenfetch
+# Tokenfetch
 
 <div align="center">
   <a href="https://github.com/fffelix-huang/tokenfetch/actions"><img src="https://github.com/fffelix-huang/tokenfetch/actions/workflows/ci.yml/badge.svg?branch=master" alt="Build Status"></a>
@@ -9,6 +9,8 @@
 </div>
 
 Tokenfetch gives summary of Claude Code token usage and estimated API cost.
+
+![tokenfetch example](screenshots/example1.png)
 
 ## Features
 
