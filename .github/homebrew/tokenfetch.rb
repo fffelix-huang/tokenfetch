@@ -24,6 +24,7 @@ class Tokenfetch < Formula
       -X main.revision=#{tap.user}
     ]
     system "go", "build", *std_go_args(ldflags:), "./cmd/tokenfetch"
+    generate_completions_from_executable(bin/"tokenfetch", shell_parameter_format: :flag)
   end
 
   test do

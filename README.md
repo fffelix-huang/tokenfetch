@@ -48,6 +48,16 @@ tokenfetch --json     # machine-readable report
 tokenfetch --help
 ```
 
+### Shell completion
+
+Homebrew installs completions automatically. Otherwise add one line to your shell config:
+
+```sh
+eval "$(tokenfetch --bash)"      # ~/.bashrc
+source <(tokenfetch --zsh)       # ~/.zshrc
+tokenfetch --fish | source       # ~/.config/fish/config.fish
+```
+
 ## How it works
 
 Tokenfetch reads Claude Code session transcripts (`~/.claude/projects/**/*.jsonl`), deduplicates streamed responses, and stores one record per model response in a local SQLite database. Each run only reads what was appended since the last run.

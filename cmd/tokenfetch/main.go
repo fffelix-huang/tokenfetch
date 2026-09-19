@@ -13,6 +13,7 @@ import (
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
 
+	"github.com/fffelix-huang/tokenfetch/internal/completion"
 	"github.com/fffelix-huang/tokenfetch/internal/ingest"
 	"github.com/fffelix-huang/tokenfetch/internal/render"
 	"github.com/fffelix-huang/tokenfetch/internal/report"
@@ -38,23 +39,31 @@ const usageText = `Tokenfetch gives summary of Claude Code token usage and estim
 Usage: tokenfetch [range] [flags]
 
 Range (pick one):
-  --all       everything recorded, activity over the past year (default)
-  --month     last 30 days
-  --week      last 7 days
-  --today     since local midnight
+  --all                everything recorded, activity over the past year (default)
+  --month              last 30 days
+  --week               last 7 days
+  --today              since local midnight
 
 Flags:
-  --json          print the report as JSON
-  --rebuild       re-read all logs; history of already-deleted logs is kept
-  -v, --version   print version
-  -h, --help      show this help
+  --json               print the report as JSON
+  --rebuild            re-read all logs; history of already-deleted logs is kept
+  --color=WHEN         color output (auto|always|never, default: auto)
 
-Environment:
+Shell Integration:
+  --bash               print bash completion script
+  --zsh                print zsh completion script
+  --fish               print fish completion script
+
+Help:
+  -v, --version        print version
+  -h, --help           show this help
+
+Environment Variables:
   TOKENFETCH_DATA_DIR  where usage history is stored
                        (default: %s)
   CLAUDE_CONFIG_DIR    Claude Code config dirs to read, comma-separated
                        (default: ~/.claude and ~/.config/claude)
-  NO_COLOR             disable colors when set
+  NO_COLOR             disable colors when set (unless --color=always)
 `
 
 func run() error {
@@ -67,6 +76,10 @@ func run() error {
 		rebuild      = flag.Bool("rebuild", false, "")
 		showVer      = flag.Bool("version", false, "")
 		showVerShort = flag.Bool("v", false, "")
+		color        = flag.String("color", "auto", "")
+		bash         = flag.Bool("bash", false, "")
+		zsh          = flag.Bool("zsh", false, "")
+		fish         = flag.Bool("fish", false, "")
 	)
 	flag.Usage = func() {
 		dir, err := store.DefaultDataDir()
@@ -89,8 +102,14 @@ func run() error {
 		}
 		return nil
 	}
-	if os.Getenv("NO_COLOR") != "" {
-		lipgloss.SetColorProfile(termenv.Ascii)
+	if script, err := completionScript(*bash, *zsh, *fish); err != nil || script != "" {
+		if err == nil {
+			fmt.Print(script)
+		}
+		return err
+	}
+	if err := setColor(*color); err != nil {
+		return err
 	}
 
 	rangeName := "all"
@@ -153,5 +172,47 @@ func run() error {
 	}
 	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
 	render.Fetch(os.Stdout, rep, width)
+	return nil
+}
+
+// completionScript returns the script for the one shell flag set, "" if none.
+func completionScript(bash, zsh, fish bool) (string, error) {
+	var scripts []string
+	for _, c := range []struct {
+		set    bool
+		script string
+	}{{bash, completion.Bash}, {zsh, completion.Zsh}, {fish, completion.Fish}} {
+		if c.set {
+			scripts = append(scripts, c.script)
+		}
+	}
+	if len(scripts) > 1 {
+		return "", fmt.Errorf("pick one of --bash, --zsh, --fish")
+	}
+	if len(scripts) == 0 {
+		return "", nil
+	}
+	return scripts[0], nil
+}
+
+// setColor applies --color. auto keeps terminal detection and honors
+// NO_COLOR; always forces color even when piped.
+func setColor(when string) error {
+	switch when {
+	case "auto":
+		if os.Getenv("NO_COLOR") != "" {
+			lipgloss.SetColorProfile(termenv.Ascii)
+		}
+	case "never":
+		lipgloss.SetColorProfile(termenv.Ascii)
+	case "always":
+		profile := termenv.ANSI256
+		if ct := os.Getenv("COLORTERM"); ct == "truecolor" || ct == "24bit" {
+			profile = termenv.TrueColor
+		}
+		lipgloss.SetColorProfile(profile)
+	default:
+		return fmt.Errorf("--color must be auto, always or never, got %q", when)
+	}
 	return nil
 }
