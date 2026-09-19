@@ -19,11 +19,9 @@ jobs:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
-      - name: gofmt
-        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
-      - name: vet
-        run: go vet ./...
+      - name: lint
+        run: make lint
       - name: test
-        run: go test ./...
+        run: make test
       - name: build
-        run: go build -o bin/tokenfetch ./cmd/tokenfetch
+        run: make build

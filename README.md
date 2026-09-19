@@ -75,14 +75,21 @@ Tokenfetch reads Claude Code session transcripts (`~/.claude/projects/**/*.jsonl
 ## Development
 
 ```sh
-go build -o bin/tokenfetch ./cmd/tokenfetch
-go test ./...
+make build    # bin/tokenfetch
+make test
+make lint
+make clean
 TOKENFETCH_DATA_DIR=/tmp/tokenfetch go run ./cmd/tokenfetch   # use a throwaway database
 ```
 
 ### Release
 
 1. Bump `version` in `cmd/tokenfetch/main.go` and commit.
-2. `git tag vX.Y.Z && git push origin vX.Y.Z`
+2. Tag and push:
+
+```sh
+git tag -s vX.Y.Z -m vX.Y.Z
+git push origin master vX.Y.Z
+```
 
 The release workflow checks the tag matches `version`, then [GoReleaser](https://goreleaser.com) builds macOS and Linux binaries and publishes the GitHub release, and the Homebrew formula in [fffelix-huang/homebrew-tap](https://github.com/fffelix-huang/homebrew-tap) is updated to the new tag.

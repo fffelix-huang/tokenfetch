@@ -13,7 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```sh
-go build -o bin/tokenfetch ./cmd/tokenfetch
+make build    # bin/tokenfetch, --version shows the commit
+make test
+make lint     # gofmt + go vet; CI runs make lint/test/build
+make clean
 go run ./cmd/tokenfetch [--today|--week|--month|--all] [--json] [--rebuild]
 go test ./...
 go test ./internal/ingest -run TestIncrementalDedup   # single test
@@ -47,9 +50,9 @@ Pipeline: `usage.Source → ingest → store (SQLite) → report → render`
 
 ## Release
 
-- Bump `version` in `cmd/tokenfetch/main.go`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/release.yml`:
+- Manual: bump `var version` in `cmd/tokenfetch/main.go`, commit, `git tag -s vX.Y.Z -m vX.Y.Z`, `git push origin master vX.Y.Z` → `.github/workflows/release.yml`:
   1. `release` job: fails if tag ≠ `var version`, tests, GoReleaser (`.goreleaser.yml`) → GitHub Release with darwin/linux × amd64/arm64 tarballs. No Homebrew config in GoReleaser.
   2. `homebrew` job: renders `.github/homebrew/tokenfetch.rb` (`@VERSION@`, `@SHA256@` of the tag's source tarball) and pushes `Formula/tokenfetch.rb` to `fffelix-huang/homebrew-tap` (secret `HOMEBREW_TAP_TOKEN`). Formula builds from source, not a cask — no quarantine/xattr handling needed.
 - Version (fzf style): `var version = "X.Y.Z"`, `var revision = "devel"`. GoReleaser sets `-X main.revision={{.ShortCommit}}`; the formula sets `-X main.revision=#{tap.user}` (fzf style: `fffelix-huang` from our tap). `--version` prints `0.1.0 (devel|abc1234|fffelix-huang)`.
-- Dry run: Actions → Release → Run workflow (snapshot, publishes nothing, skips homebrew job). No Makefile.
+- Dry run: Actions → Release → Run workflow (snapshot, publishes nothing, skips homebrew job).
 - v2+ requires module path `/v2` suffix.
