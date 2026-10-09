@@ -33,6 +33,10 @@ func TestCost(t *testing.T) {
 		searches                int64
 		want                    float64
 	}{
+		{"opus 5.5 all categories", "claude-opus-5-5", "standard", "", mtok, 0, 4 + 20 + 0.2 + 5 + 8},
+		{"opus 5.5 fast", "claude-opus-5-5", "fast", "", mtok, 0, 8 + 40 + 0.4 + 10 + 16},
+		{"sonnet 5.5 cache read 0.05x", "claude-sonnet-5-5", "", "", usage.Tokens{CacheRead: 1e6}, 0, 0.1},
+		{"haiku 5.5 short prompt rates", "claude-haiku-5-5", "", "", usage.Tokens{Input: 1e6, Output: 1e6}, 0, 0.1 + 0.5},
 		{"opus 5 all categories", "claude-opus-5", "standard", "", mtok, 0, 5 + 25 + 0.5 + 6.25 + 10},
 		{"opus 5 fast", "claude-opus-5", "fast", "", mtok, 0, 10 + 50 + 1 + 12.5 + 20},
 		{"fable 5.1 cheap cache read", "claude-fable-5-1", "", "", usage.Tokens{CacheRead: 1e6}, 0, 0.25},

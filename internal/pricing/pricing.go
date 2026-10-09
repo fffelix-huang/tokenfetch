@@ -1,6 +1,6 @@
 // Package pricing estimates USD cost from token counts using Anthropic list prices.
 //
-// Source: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-09-17).
+// Source: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-10-09).
 // Subscription (Pro/Max) users are not billed per token; this is the API-equivalent cost.
 package pricing
 
@@ -32,6 +32,11 @@ func std(in, out float64) Rates {
 
 func opusFastModeRates() *Rates { r := std(10, 50); return &r }
 
+// opus55FastModeRates is 2x base, cache multipliers applied on top of the fast base.
+func opus55FastModeRates() *Rates {
+	return &Rates{Input: 8, Output: 40, CacheWrite5m: 10, CacheWrite1h: 16, CacheRead: 0.4}
+}
+
 func withGeo(r Rates) Rates { r.GeoPremium = true; return r }
 
 // table is keyed by normalized model id (see Normalize).
@@ -40,6 +45,7 @@ var table = map[string]Rates{
 	"claude-mythos-5-1": withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
 	"claude-fable-5":    withGeo(std(10, 50)),
 	"claude-mythos-5":   withGeo(std(10, 50)),
+	"claude-opus-5-5":   withGeo(Rates{Input: 4, Output: 20, CacheWrite5m: 5, CacheWrite1h: 8, CacheRead: 0.2, Fast: opus55FastModeRates()}),
 	"claude-opus-5":     withGeo(Rates{Input: 5, Output: 25, CacheWrite5m: 6.25, CacheWrite1h: 10, CacheRead: 0.5, Fast: opusFastModeRates()}),
 	"claude-opus-4-8":   withGeo(Rates{Input: 5, Output: 25, CacheWrite5m: 6.25, CacheWrite1h: 10, CacheRead: 0.5, Fast: opusFastModeRates()}),
 	"claude-opus-4-7":   withGeo(std(5, 25)),
@@ -47,12 +53,16 @@ var table = map[string]Rates{
 	"claude-opus-4-5":   std(5, 25),
 	"claude-opus-4-1":   std(15, 75),
 	"claude-opus-4":     std(15, 75),
+	"claude-sonnet-5-5": withGeo(Rates{Input: 2, Output: 10, CacheWrite5m: 2.5, CacheWrite1h: 4, CacheRead: 0.1}),
 	"claude-sonnet-5":   withGeo(std(2, 10)),
 	"claude-sonnet-4-6": withGeo(std(3, 15)),
 	"claude-sonnet-4-5": std(3, 15),
 	"claude-sonnet-4":   std(3, 15),
-	"claude-haiku-4-5":  std(1, 5),
-	"claude-3-5-haiku":  std(0.8, 4),
+	// Haiku 5.5 is priced by prompt length; these are the <=100k rates (5x above it,
+	// which needs per-request prompt size and so is not applied).
+	"claude-haiku-5-5": withGeo(std(0.1, 0.5)),
+	"claude-haiku-4-5": std(1, 5),
+	"claude-3-5-haiku": std(0.8, 4),
 }
 
 var (
