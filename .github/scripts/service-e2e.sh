@@ -51,6 +51,17 @@ grep -q 'last run: ' <<<"$status" || fail "status has no last run"
 grep -q 'next run: ' <<<"$status" || fail "status has no next run"
 grep -q 'last exit: ok' <<<"$status" || fail "last run failed"
 
+# Installing again replaces the job: one timer, new schedule live in systemd,
+# not just in the file.
+echo "--- reinstall with another interval"
+"$tf" service install --interval=hourly
+grep -qx 'OnCalendar=hourly' "$units/tokenfetch.timer" || fail "reinstall kept the old interval in the unit"
+calendar=$(systemctl --user show tokenfetch.timer --property=TimersCalendar --value)
+echo "$calendar"
+[[ $calendar == *'*-*-* *:00:00'* ]] || fail "systemd still runs the old schedule: $calendar"
+[[ $(systemctl --user list-timers 'tokenfetch*' --all --no-legend | wc -l) == 1 ]] || fail "more than one timer"
+"$tf" service status | grep -q '^active · systemd · every hour$' || fail "status after reinstall"
+
 # What the job is for: usage survives Claude Code deleting the transcript.
 # The report below ingests too, but there is nothing left for it to read.
 echo "--- usage recorded by the job"
