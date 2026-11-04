@@ -48,6 +48,16 @@ tokenfetch --json     # machine-readable report
 tokenfetch --help
 ```
 
+### Record usage in the background
+
+```sh
+tokenfetch service install                  # hourly; --interval=daily|weekly
+tokenfetch service status
+tokenfetch service uninstall                # recorded usage is kept
+```
+
+This runs `tokenfetch ingest` periodically (launchd agent on macOS, systemd user timer on Linux), so usage is recorded even if you don't open tokenfetch before Claude Code deletes old transcripts.
+
 ### Shell completion
 
 Homebrew installs completions automatically. Otherwise add one line to your shell config:
@@ -64,7 +74,7 @@ Tokenfetch reads Claude Code session transcripts (`~/.claude/projects/**/*.jsonl
 
 **Cost is an estimate.** It applies [Anthropic API list prices](https://platform.claude.com/docs/en/about-claude/pricing) to recorded tokens. On a Pro or Max subscription you are not billed per token; the figure shows what the same usage would cost on the API.
 
-**Keep your history.** Claude Code deletes transcripts that haven't been modified for `cleanupPeriodDays` (default 30). tokenfetch keeps everything it has already read, but it can't recover transcripts deleted before it ran. Run it regularly, or keep transcripts longer in `~/.claude/settings.json`:
+**Keep your history.** Claude Code deletes transcripts that haven't been modified for `cleanupPeriodDays` (default 30). tokenfetch keeps everything it has already read, but it can't recover transcripts deleted before it ran. Install the background job (`tokenfetch service install`), or keep transcripts longer in `~/.claude/settings.json`:
 
 ```json
 {

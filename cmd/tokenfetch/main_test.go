@@ -24,6 +24,20 @@ func TestCompletionsCoverHelp(t *testing.T) {
 	}
 }
 
+// Every command in --help must be offered by every completion script.
+func TestCompletionsCoverCommands(t *testing.T) {
+	for _, cmd := range []string{"ingest", "service", "install", "uninstall", "status", "hourly", "daily", "weekly"} {
+		if !strings.Contains(usageText+serviceUsage, cmd) {
+			t.Fatalf("%q not in help; update this test", cmd)
+		}
+		for shell, script := range map[string]string{"bash": completion.Bash, "zsh": completion.Zsh, "fish": completion.Fish} {
+			if !strings.Contains(script, cmd) {
+				t.Errorf("%s completion missing %s", shell, cmd)
+			}
+		}
+	}
+}
+
 func TestSetColor(t *testing.T) {
 	for _, when := range []string{"auto", "always", "never"} {
 		if err := setColor(when); err != nil {
