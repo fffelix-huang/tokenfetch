@@ -25,3 +25,17 @@ jobs:
         run: make test
       - name: build
         run: make build
+
+  service-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+      - name: build
+        run: make build
+      - name: service e2e
+        run: .github/scripts/service-e2e.sh bin/tokenfetch
