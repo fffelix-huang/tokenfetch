@@ -122,29 +122,29 @@ func Status() (State, error) {
 	} else if out != "" {
 		st.Detail = out
 	}
-	st.LastRun = timerTime(unitName+".timer", "LastTriggerUSec")
-	st.NextRun = timerTime(unitName+".timer", "NextElapseUSecRealtime")
-	if out, err := systemctl("show", unitName+".service", "--property=ExecMainStatus", "--value"); err == nil {
-		if code, err := strconv.Atoi(strings.TrimSpace(out)); err == nil {
-			st.LastExit = code
+	// The service, not the timer: install starts the service directly, which
+	// the timer's LastTrigger doesn't count.
+	st.LastRun = showTime(unitName+".service", "ExecMainExitTimestamp")
+	st.NextRun = showTime(unitName+".timer", "NextElapseUSecRealtime")
+	// ExecMainStatus reads 0 before the first run too; only trust it after one.
+	if !st.LastRun.IsZero() {
+		if out, err := systemctl("show", unitName+".service", "--property=ExecMainStatus", "--value"); err == nil {
+			if code, err := strconv.Atoi(strings.TrimSpace(out)); err == nil {
+				st.LastExit = code
+			}
 		}
 	}
 	return st, nil
 }
 
-// timerTime reads a systemd timestamp property. systemd prints either
-// microseconds since the epoch or a human string depending on version, so a
-// value that doesn't parse as a number is reported as unknown.
-func timerTime(unit, property string) time.Time {
-	out, err := systemctl("show", unit, "--property="+property, "--value")
+// showTime reads a systemd timestamp property as "@<unix seconds>"; zero when
+// unset or when systemd predates --timestamp=unix (v247).
+func showTime(unit, property string) time.Time {
+	out, err := systemctl("show", unit, "--property="+property, "--value", "--timestamp=unix")
 	if err != nil {
 		return time.Time{}
 	}
-	usec, err := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
-	if err != nil || usec <= 0 {
-		return time.Time{}
-	}
-	return time.UnixMicro(usec)
+	return parseUnixTimestamp(out)
 }
 
 // intervalFromTimer reads OnCalendar back out of a timer unit, "" when it is

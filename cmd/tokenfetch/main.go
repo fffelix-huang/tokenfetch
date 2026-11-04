@@ -362,7 +362,7 @@ func serviceStatus() error {
 	}
 	fmt.Printf("%s · %s", state, st.Manager)
 	if st.Interval != "" {
-		fmt.Printf(" · every %s", strings.TrimSuffix(string(st.Interval), "ly"))
+		fmt.Printf(" · every %s", st.Interval.Unit())
 	}
 	fmt.Println()
 	if !st.LastRun.IsZero() {

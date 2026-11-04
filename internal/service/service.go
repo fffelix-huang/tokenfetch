@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -58,6 +59,18 @@ func (i Interval) Seconds() int {
 		return int((7 * 24 * time.Hour).Seconds())
 	default:
 		return int(time.Hour.Seconds())
+	}
+}
+
+// Unit names one period, as in "every hour".
+func (i Interval) Unit() string {
+	switch i {
+	case Daily:
+		return "day"
+	case Weekly:
+		return "week"
+	default:
+		return "hour"
 	}
 }
 
@@ -121,6 +134,16 @@ type State struct {
 	Files     []string
 	LogPath   string
 	Detail    string // manager's own words, shown as-is
+}
+
+// parseUnixTimestamp reads systemctl's --timestamp=unix form, "@1699999999";
+// zero for anything else, including "n/a" and "" (never happened).
+func parseUnixTimestamp(s string) time.Time {
+	secs, err := strconv.ParseInt(strings.TrimPrefix(strings.TrimSpace(s), "@"), 10, 64)
+	if err != nil || secs <= 0 || !strings.HasPrefix(strings.TrimSpace(s), "@") {
+		return time.Time{}
+	}
+	return time.Unix(secs, 0)
 }
 
 // renderPlist builds the launchd agent. RunAtLoad makes `service install`

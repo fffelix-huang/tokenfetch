@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseInterval(t *testing.T) {
@@ -13,6 +14,25 @@ func TestParseInterval(t *testing.T) {
 	}
 	if _, err := ParseInterval("fortnightly"); err == nil {
 		t.Error("unknown interval should fail")
+	}
+}
+
+func TestParseUnixTimestamp(t *testing.T) {
+	if got := parseUnixTimestamp("@1762232400\n"); !got.Equal(time.Unix(1762232400, 0)) {
+		t.Errorf("parseUnixTimestamp(@1762232400) = %v", got)
+	}
+	for _, s := range []string{"", "n/a", "@0", "1762232400", "Wed 2025-11-04 05:00:00 UTC"} {
+		if got := parseUnixTimestamp(s); !got.IsZero() {
+			t.Errorf("parseUnixTimestamp(%q) = %v, want zero", s, got)
+		}
+	}
+}
+
+func TestIntervalUnit(t *testing.T) {
+	for i, want := range map[Interval]string{Hourly: "hour", Daily: "day", Weekly: "week"} {
+		if got := i.Unit(); got != want {
+			t.Errorf("%s.Unit() = %q, want %q", i, got, want)
+		}
 	}
 }
 
