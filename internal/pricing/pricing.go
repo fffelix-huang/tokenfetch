@@ -1,6 +1,6 @@
 // Package pricing estimates USD cost from token counts using Anthropic list prices.
 //
-// Source: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-10-09).
+// Source: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-11-04).
 // Subscription (Pro/Max) users are not billed per token; this is the API-equivalent cost.
 package pricing
 
