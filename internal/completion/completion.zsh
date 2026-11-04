@@ -3,6 +3,37 @@
 # Setup: source <(tokenfetch --zsh) in ~/.zshrc, or install as _tokenfetch in $fpath
 
 _tokenfetch() {
+  case $words[2] in
+    service)
+      shift 2 words
+      (( CURRENT -= 2 ))
+      if (( CURRENT == 1 )); then
+        local -a cmds=(
+          'install:install the periodic job and ingest once now'
+          'uninstall:remove the periodic job, keep recorded usage'
+          'status:show whether the periodic job is installed and healthy'
+        )
+        _describe command cmds
+      elif [[ $words[1] == install ]]; then
+        _arguments '--interval=[how often to run]:every:(hourly daily weekly)'
+      fi
+      return
+      ;;
+    ingest)
+      (( CURRENT == 2 )) || return
+      ;;
+  esac
+
+  # Commands only as the first word.
+  if (( CURRENT == 2 )) && [[ $PREFIX != -* ]]; then
+    local -a cmds=(
+      'ingest:record new usage without printing a report'
+      'service:manage the periodic ingest job'
+    )
+    _describe command cmds
+    return
+  fi
+
   local ranges='(--all --month --week --today)'
   _arguments -s \
     "${ranges}--all[everything recorded, activity over the past year (default)]" \
