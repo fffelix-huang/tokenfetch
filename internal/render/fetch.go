@@ -127,7 +127,13 @@ func sidePanel(r *report.Report, height int) string {
 		name  func(string) string
 	}
 	var secs []section
+	// One provider is already implied by its models; list them only when mixed.
+	var providers []report.Row
+	if len(r.Providers) > 1 {
+		providers = r.Providers
+	}
 	for _, s := range []section{
+		{"Providers", providers, ident},
 		{"Models", r.Models, ident},
 		{"Projects", r.Projects, shortPath},
 		{"Skills", r.Skills, ident},

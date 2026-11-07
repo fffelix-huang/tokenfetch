@@ -1,24 +1,32 @@
-// Package pricing estimates USD cost from token counts using Anthropic list prices.
+// Package pricing estimates USD cost from token counts using list prices.
 //
-// Source: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-11-08).
-// Subscription (Pro/Max) users are not billed per token; this is the API-equivalent cost.
+// Sources: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-11-08),
+// https://developers.openai.com/api/docs/pricing (fetched 2026-11-08).
+// Subscription users (Claude Pro/Max, ChatGPT plans) are not billed per token;
+// this is the API-equivalent cost.
 package pricing
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
 
-// Rates are USD per million tokens.
+// Rates are USD per million tokens. CacheWrite5m/CacheWrite1h are the short
+// and long cache-write lifetimes: Anthropic 5m/1h, OpenAI 30m/12h.
 type Rates struct {
 	Input, Output, CacheWrite5m, CacheWrite1h, CacheRead float64
-	// Fast is the speed:"fast" base rate set, nil if unsupported.
+	// Fast is the speed:"fast" rate set (OpenAI: Priority), nil if unsupported.
 	Fast *Rates
-	// LongPrompt is the rate set for requests whose prompt (input + cache
-	// read + cache write) exceeds LongPromptTokens; nil = flat pricing.
-	LongPrompt *Rates
+	// Flex is the speed:"flex" rate set (OpenAI Flex processing), nil if unsupported.
+	Flex *Rates
+	// LongPrompt is the rate set for requests whose prompt (input + cache read
+	// + cache write) exceeds LongPromptAbove; nil = flat pricing. Fast and
+	// Flex carry their own LongPrompt, applied at the parent's threshold.
+	LongPrompt      *Rates
+	LongPromptAbove int64
 	// GeoPremium: inference_geo "us" costs 1.1x (Claude 4.6+).
 	GeoPremium bool
 }
@@ -42,10 +50,33 @@ func opus55FastModeRates() *Rates {
 
 func withGeo(r Rates) Rates { r.GeoPremium = true; return r }
 
-func withLongPrompt(r, long Rates) Rates { r.LongPrompt = &long; return r }
+func withLongPrompt(r, long Rates, above int64) Rates {
+	r.LongPrompt, r.LongPromptAbove = &long, above
+	return r
+}
 
-// LongPromptTokens is the prompt size above which LongPrompt rates apply.
-const LongPromptTokens = 100_000
+// PromptThresholds lists every LongPromptAbove in the table, ascending;
+// usage must be grouped by the largest one each request's prompt exceeds.
+func PromptThresholds() []int64 {
+	var out []int64
+	for _, r := range table {
+		if r.LongPrompt != nil && !slices.Contains(out, r.LongPromptAbove) {
+			out = append(out, r.LongPromptAbove)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// gpt6Luna: Standard, Flex and Priority ("Fast") tiers, each with its own
+// >272K-input long-context rates.
+var gpt6Luna = withLongPrompt(Rates{
+	Input: 0.10, CacheRead: 0.01, CacheWrite5m: 0.125, CacheWrite1h: 0.25, Output: 0.50,
+	Flex: &Rates{Input: 0.05, CacheRead: 0.005, CacheWrite5m: 0.0625, CacheWrite1h: 0.125, Output: 0.25,
+		LongPrompt: &Rates{Input: 0.10, CacheRead: 0.01, CacheWrite5m: 0.125, CacheWrite1h: 0.25, Output: 0.375}},
+	Fast: &Rates{Input: 0.20, CacheRead: 0.02, CacheWrite5m: 0.25, CacheWrite1h: 0.50, Output: 1.00,
+		LongPrompt: &Rates{Input: 0.40, CacheRead: 0.04, CacheWrite5m: 0.50, CacheWrite1h: 1.00, Output: 1.50}},
+}, Rates{Input: 0.20, CacheRead: 0.02, CacheWrite5m: 0.25, CacheWrite1h: 0.50, Output: 0.75}, 272_000)
 
 // table is keyed by normalized model id (see Normalize).
 var table = map[string]Rates{
@@ -67,13 +98,17 @@ var table = map[string]Rates{
 	"claude-sonnet-4-5": std(3, 15),
 	"claude-sonnet-4":   std(3, 15),
 	// Haiku 5.5 is priced per request by prompt length: 5x on every category over 100k.
-	"claude-haiku-5-5": withGeo(withLongPrompt(std(0.1, 0.5), std(0.5, 2.5))),
+	"claude-haiku-5-5": withGeo(withLongPrompt(std(0.1, 0.5), std(0.5, 2.5), 100_000)),
 	"claude-haiku-4-5": std(1, 5),
 	"claude-3-5-haiku": std(0.8, 4),
+
+	// OpenAI (Codex). Only models whose every tier was checked; others stay
+	// unpriced until added.
+	"gpt-6-luna": gpt6Luna,
 }
 
 var (
-	dateSuffix    = regexp.MustCompile(`[-@]\d{8}$`)
+	dateSuffix    = regexp.MustCompile(`[-@]\d{8}$|-\d{4}-\d{2}-\d{2}$`) // Anthropic / OpenAI snapshots
 	bedrockSuffix = regexp.MustCompile(`-v\d+(:\d+)?$`)
 )
 
@@ -100,23 +135,27 @@ func Lookup(model string) (Rates, bool) {
 	return r, ok
 }
 
-// Cost prices tokens that share model, speed, geo and prompt-length tier
-// (longPrompt: each request's prompt was over LongPromptTokens); ok=false if
-// the model is unknown.
-func Cost(model, speed, geo string, longPrompt bool, t usage.Tokens, webSearches int64) (float64, bool) {
+// Cost prices tokens that share model, speed, geo and prompt-length bucket
+// (promptOver: the largest PromptThresholds value every request's prompt
+// exceeded, 0 for none); ok=false if the model is unknown.
+func Cost(model, speed, geo string, promptOver int64, t usage.Tokens, webSearches int64) (float64, bool) {
 	r, ok := Lookup(model)
 	if !ok {
 		return 0, false
 	}
-	return costOf(r, speed, geo, longPrompt, t, webSearches), true
+	return costOf(r, speed, geo, promptOver, t, webSearches), true
 }
 
-func costOf(r Rates, speed, geo string, longPrompt bool, t usage.Tokens, webSearches int64) float64 {
+func costOf(r Rates, speed, geo string, promptOver int64, t usage.Tokens, webSearches int64) float64 {
 	geoPremium := r.GeoPremium
+	long := r.LongPromptAbove > 0 && promptOver >= r.LongPromptAbove
 	switch {
 	case speed == "fast" && r.Fast != nil:
 		r = *r.Fast
-	case longPrompt && r.LongPrompt != nil:
+	case speed == "flex" && r.Flex != nil:
+		r = *r.Flex
+	}
+	if long && r.LongPrompt != nil {
 		r = *r.LongPrompt
 	}
 	r.GeoPremium = geoPremium

@@ -86,7 +86,15 @@ func ingestFile(tx *store.Tx, src usage.Source, path string, offset int64, stats
 		return offset, nil // vanished between Stat and Open
 	}
 	defer f.Close()
-	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+	parser := src.NewParser()
+	// A context parser re-reads the already-ingested prefix for state only;
+	// its events are stored already.
+	cp, replay := parser.(usage.ContextParser)
+	pos := offset
+	if replay {
+		pos = 0
+	}
+	if _, err := f.Seek(pos, io.SeekStart); err != nil {
 		return offset, err
 	}
 	r := bufio.NewReaderSize(f, 1<<20)
@@ -98,12 +106,19 @@ func ingestFile(tx *store.Tx, src usage.Source, path string, offset int64, stats
 		if err != nil {
 			return offset, err
 		}
-		offset += int64(len(line))
+		pos += int64(len(line))
 		line = bytes.TrimSpace(line)
+		if pos <= offset {
+			if len(line) > 0 {
+				cp.Context(line)
+			}
+			continue
+		}
+		offset = pos
 		if len(line) == 0 {
 			continue
 		}
-		ev, ok, err := src.ParseLine(line)
+		ev, ok, err := parser.ParseLine(line)
 		if err != nil {
 			stats.BadLines++
 			continue

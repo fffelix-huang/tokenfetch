@@ -22,7 +22,7 @@ func insert(t *testing.T, st *Store, ev usage.Event) {
 
 func count(t *testing.T, st *Store) int64 {
 	t.Helper()
-	groups, err := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), 100_000)
+	groups, err := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), nil)
 	require.NoError(t, err)
 	var n int64
 	for _, g := range groups {
@@ -53,7 +53,7 @@ func TestUpsertRefreshesAllColumns(t *testing.T) {
 	fixed := ev
 	fixed.Skill = "tdd"
 	insert(t, st, fixed)
-	groups, _ := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), 100_000)
+	groups, _ := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), nil)
 	require.Len(t, groups, 1)
 	assert.Equal(t, "tdd", groups[0].Skill, "re-read should refresh non-token columns")
 }
@@ -99,23 +99,29 @@ func TestMoveLegacy(t *testing.T) {
 	assert.False(t, moved, "second move should be a no-op")
 }
 
-// Requests over the long-prompt threshold group apart so they can be priced apart.
-func TestGroupsSplitLongPrompt(t *testing.T) {
+// Requests group by the largest prompt threshold they exceed, so each
+// model's per-request price tier survives aggregation.
+func TestGroupsSplitByPromptThreshold(t *testing.T) {
 	st, err := Open(filepath.Join(t.TempDir(), fileName))
 	require.NoError(t, err)
 	defer st.Close()
-	at, over, overByWrite := ev, ev, ev
+	at, over, overByWrite, overBoth := ev, ev, ev, ev
 	at.MessageID, at.Input, at.CacheRead = "a", 10, 99_990 // prompt 100_000: not over
 	over.MessageID, over.Input, over.CacheRead = "b", 10, 100_000
 	overByWrite.MessageID, overByWrite.CacheRead, overByWrite.CacheWrite1h = "c", 100_000, 1
-	for _, e := range []usage.Event{at, over, overByWrite} {
+	overBoth.MessageID, overBoth.CacheRead = "d", 300_000
+	for _, e := range []usage.Event{at, over, overByWrite, overBoth} {
 		insert(t, st, e)
 	}
-	groups, err := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), 100_000)
-	require.NoError(t, err)
-	byLong := map[bool]int64{}
-	for _, g := range groups {
-		byLong[g.LongPrompt] += g.Messages
+	byBucket := func(thresholds []int64) map[int64]int64 {
+		groups, err := st.Groups(time.Unix(0, 0), time.Unix(1<<40, 0), thresholds)
+		require.NoError(t, err)
+		out := map[int64]int64{}
+		for _, g := range groups {
+			out[g.PromptOver] += g.Messages
+		}
+		return out
 	}
-	assert.Equal(t, map[bool]int64{false: 1, true: 2}, byLong)
+	assert.Equal(t, map[int64]int64{0: 1, 100_000: 2, 272_000: 1}, byBucket([]int64{272_000, 100_000}))
+	assert.Equal(t, map[int64]int64{0: 4}, byBucket(nil))
 }

@@ -52,6 +52,21 @@ type Source interface {
 	Name() string
 	// Files lists log files to scan. Missing data dir is not an error.
 	Files() ([]string, error)
+	// NewParser returns a parser for one file; it is fed that file's lines in order.
+	NewParser() Parser
+}
+
+// Parser decodes one file's log lines.
+type Parser interface {
 	// ParseLine decodes one log line; ok=false for lines without usage.
 	ParseLine(line []byte) (ev Event, ok bool, err error)
+}
+
+// ContextParser is a Parser whose lines depend on earlier lines of the same
+// file (e.g. Codex logs the model once per turn, not per response). When
+// ingest resumes mid-file it first replays the already-ingested lines through
+// Context, which records state and emits nothing.
+type ContextParser interface {
+	Parser
+	Context(line []byte)
 }

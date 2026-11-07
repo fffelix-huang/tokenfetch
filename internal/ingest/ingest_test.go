@@ -11,6 +11,7 @@ import (
 
 	"github.com/fffelix-huang/tokenfetch/internal/report"
 	"github.com/fffelix-huang/tokenfetch/internal/source/claudecode"
+	"github.com/fffelix-huang/tokenfetch/internal/source/codex"
 	"github.com/fffelix-huang/tokenfetch/internal/store"
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
@@ -87,4 +88,37 @@ func TestHalfHourTimezoneBuckets(t *testing.T) {
 	assert.EqualValues(t, 20, rep.PeakHour)
 	// 2026-09-16 is a Wednesday.
 	assert.EqualValues(t, 302, rep.Heatmap[2][20].Total, "heatmap Wed 20h")
+}
+
+// Codex logs the model and cwd once per turn; a record appended after an
+// incremental run must still get them from the already-ingested prefix.
+func TestContextReplayAcrossRuns(t *testing.T) {
+	root := t.TempDir()
+	log := filepath.Join(root, "sessions", "2026", "09", "16", "rollout.jsonl")
+	require.NoError(t, os.MkdirAll(filepath.Dir(log), 0o755))
+	st, err := store.Open(filepath.Join(t.TempDir(), "cache.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { st.Close() })
+	srcs := []usage.Source{&codex.Source{Roots: []string{root}}}
+
+	appendTo(t, log, `{"timestamp":"2026-09-16T14:00:00Z","type":"session_meta","payload":{"id":"s1","cwd":"/p","git":{"branch":"main"}}}`+"\n"+
+		`{"timestamp":"2026-09-16T14:00:01Z","type":"turn_context","payload":{"turn_id":"t1","model":"gpt-6-luna"}}`+"\n"+
+		`{"timestamp":"2026-09-16T14:00:02Z","type":"token_usage_record","payload":{"response_id":"r1","turn_id":"t1","usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":10,"total_tokens":110}}}`+"\n")
+	_, err = Run(st, srcs)
+	require.NoError(t, err)
+
+	appendTo(t, log, `{"timestamp":"2026-09-16T14:00:03Z","type":"token_usage_record","payload":{"response_id":"r2","turn_id":"t1","usage":{"input_tokens":200,"output_tokens":20,"total_tokens":220}}}`+"\n")
+	stats, err := Run(st, srcs)
+	require.NoError(t, err)
+	assert.Equal(t, 1, stats.Events, "prefix replay adds no events")
+
+	rep := build(t, st, time.UTC)
+	require.Len(t, rep.Models, 1)
+	assert.Equal(t, "gpt-6-luna", rep.Models[0].Name)
+	assert.EqualValues(t, 2, rep.Models[0].Messages, "both responses carry the turn's model")
+	require.Len(t, rep.Projects, 1)
+	assert.Equal(t, "/p", rep.Projects[0].Name)
+	require.Len(t, rep.Providers, 1)
+	assert.Equal(t, codex.Provider, rep.Providers[0].Name)
+	assert.EqualValues(t, 60+40+10+200+20, rep.Total)
 }
