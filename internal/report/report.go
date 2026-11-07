@@ -81,7 +81,7 @@ type Report struct {
 
 // Build aggregates the store over r in loc.
 func Build(st *store.Store, r Range, loc *time.Location) (*Report, error) {
-	groups, err := st.Groups(r.From, r.To)
+	groups, err := st.Groups(r.From, r.To, pricing.LongPromptTokens)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func Build(st *store.Store, r Range, loc *time.Location) (*Report, error) {
 	unpriced := map[string]bool{}
 
 	for _, g := range groups {
-		cost, ok := pricing.Cost(g.Model, g.Speed, g.Geo, g.Tokens, g.WebSearches)
+		cost, ok := pricing.Cost(g.Model, g.Speed, g.Geo, g.LongPrompt, g.Tokens, g.WebSearches)
 		if !ok {
 			unpriced[g.Model] = true
 		}

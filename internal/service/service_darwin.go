@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const manager = "launchd"
@@ -118,11 +117,11 @@ func Status() (State, error) {
 			st.Interval = intervalFromSeconds(secs)
 		}
 	}
+	// No NextRun: StartInterval firings during sleep are dropped (launchd.plist(5))
+	// and launchctl doesn't report the next one, so last run + interval can be
+	// in the past.
 	if fi, err := os.Stat(log); err == nil && fi.Size() > 0 {
 		st.LastRun = fi.ModTime()
-		if !st.LastRun.IsZero() && st.Interval != "" {
-			st.NextRun = st.LastRun.Add(time.Duration(st.Interval.Seconds()) * time.Second)
-		}
 	}
 	out, err := exec.Command("launchctl", "print", serviceTarget()).CombinedOutput()
 	if err != nil {

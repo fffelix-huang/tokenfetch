@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -39,4 +41,14 @@ func TestSetColor(t *testing.T) {
 		assert.NoError(t, setColor(when), "setColor(%q)", when)
 	}
 	assert.Error(t, setColor("sometimes"), "invalid --color value should fail")
+}
+
+// go run builds under the temp dir; on macOS that path resolves through the
+// /var -> /private/var symlink, so the check must compare resolved paths.
+func TestUnderTempDir(t *testing.T) {
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	assert.True(t, underTempDir(filepath.Join(dir, "exe", "tokenfetch")), "resolved temp path")
+	assert.True(t, underTempDir(filepath.Join(os.TempDir(), "go-build1", "tokenfetch")), "unresolved temp path")
+	assert.False(t, underTempDir("/usr/local/bin/tokenfetch"))
 }

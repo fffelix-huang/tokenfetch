@@ -279,20 +279,25 @@ type Group struct {
 	Agent    string
 	Speed    string
 	Geo      string
+	// LongPrompt: every event's prompt (input + cache read + cache write)
+	// was over the threshold passed to Groups, for per-request price tiers.
+	LongPrompt bool
 	usage.Tokens
 	WebSearches int64
 	Messages    int64
 }
 
-// Groups returns slot groups with ts in [from, to).
-func (s *Store) Groups(from, to time.Time) ([]Group, error) {
+// Groups returns slot groups with ts in [from, to). Events whose prompt is
+// over longPrompt tokens group apart from the rest (see Group.LongPrompt).
+func (s *Store) Groups(from, to time.Time, longPrompt int64) ([]Group, error) {
 	rows, err := s.db.Query(`
 SELECT ts / ?1 * ?1 AS slot, provider, model, project, skill, plugin, agent, speed, geo,
+	input + cache_read + cache_write_5m + cache_write_1h > ?4 AS long_prompt,
 	SUM(input), SUM(output), SUM(cache_read), SUM(cache_write_5m), SUM(cache_write_1h),
 	SUM(web_searches), COUNT(*)
 FROM events WHERE ts >= ?2 AND ts < ?3
-GROUP BY slot, provider, model, project, skill, plugin, agent, speed, geo
-ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix())
+GROUP BY slot, provider, model, project, skill, plugin, agent, speed, geo, long_prompt
+ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix(), longPrompt)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +306,7 @@ ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix())
 	for rows.Next() {
 		var g Group
 		var h int64
-		if err := rows.Scan(&h, &g.Provider, &g.Model, &g.Project, &g.Skill, &g.Plugin, &g.Agent, &g.Speed, &g.Geo,
+		if err := rows.Scan(&h, &g.Provider, &g.Model, &g.Project, &g.Skill, &g.Plugin, &g.Agent, &g.Speed, &g.Geo, &g.LongPrompt,
 			&g.Input, &g.Output, &g.CacheRead, &g.CacheWrite5m, &g.CacheWrite1h, &g.WebSearches, &g.Messages); err != nil {
 			return nil, err
 		}

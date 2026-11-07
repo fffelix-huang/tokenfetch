@@ -4,6 +4,7 @@ package claudecode
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -120,6 +121,14 @@ func (s *Source) ParseLine(b []byte) (usage.Event, bool, error) {
 	}
 	if id == "" {
 		id = l.UUID
+	}
+	// Both are malformed: an empty id would merge unrelated responses into one
+	// event, a zero time would sit before every range and never be shown.
+	if id == "" {
+		return usage.Event{}, false, errors.New("assistant line without message id")
+	}
+	if l.Timestamp.IsZero() {
+		return usage.Event{}, false, errors.New("assistant line without timestamp")
 	}
 
 	ev := usage.Event{
