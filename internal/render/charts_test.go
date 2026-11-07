@@ -172,3 +172,18 @@ func TestDownBlock(t *testing.T) {
 		assert.Equal(t, want, downBlock(eighths), "downBlock(%d)", eighths)
 	}
 }
+
+// Harness and model are independent, so Harnesses shows even for one harness,
+// right above Models.
+func TestSidePanelHarnessesAboveModels(t *testing.T) {
+	r := &report.Report{
+		Total:     10,
+		Harnesses: []report.Row{{Name: "claude-code", Total: 10}},
+		Models:    []report.Row{{Name: "claude-opus-5-5", Total: 6}, {Name: "gpt-6-luna", Total: 4}},
+	}
+	out := sidePanel(r, 10)
+	h, m := strings.Index(out, "Harnesses"), strings.Index(out, "Models")
+	require.GreaterOrEqual(t, h, 0, "no Harnesses section:\n%s", out)
+	assert.Less(t, h, m, "Harnesses should precede Models:\n%s", out)
+	assert.Contains(t, out, "claude-code")
+}

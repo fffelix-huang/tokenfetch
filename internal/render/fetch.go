@@ -127,7 +127,9 @@ func sidePanel(r *report.Report, height int) string {
 		name  func(string) string
 	}
 	var secs []section
+	// Harness and model are independent: one harness can run several vendors' models.
 	for _, s := range []section{
+		{"Harnesses", r.Harnesses, ident},
 		{"Models", r.Models, ident},
 		{"Projects", r.Projects, shortPath},
 		{"Skills", r.Skills, ident},

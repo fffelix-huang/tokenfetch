@@ -29,7 +29,7 @@ done
 systemctl --user is-system-running --wait || true # "degraded" is fine
 
 # Isolated data and transcripts; the job must inherit both from install.
-export TOKENFETCH_DATA_DIR=$work/data CLAUDE_CONFIG_DIR=$work/claude
+export TOKENFETCH_DATA_DIR=$work/data CLAUDE_CONFIG_DIR=$work/claude CODEX_HOME=$work/codex
 mkdir -p "$CLAUDE_CONFIG_DIR/projects/-e2e"
 cp internal/source/claudecode/testdata/session.jsonl "$CLAUDE_CONFIG_DIR/projects/-e2e/"
 want=$(TOKENFETCH_DATA_DIR=$work/expected "$tf" --all --json | jq .messages)

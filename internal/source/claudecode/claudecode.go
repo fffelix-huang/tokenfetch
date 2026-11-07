@@ -41,6 +41,9 @@ func New() *Source {
 
 func (s *Source) Name() string { return Provider }
 
+// NewParser returns s: every Claude Code line is self-contained.
+func (s *Source) NewParser() usage.Parser { return s }
+
 func (s *Source) Files() ([]string, error) {
 	var files []string
 	for _, root := range s.Roots {

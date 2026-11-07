@@ -19,6 +19,7 @@ import (
 	"github.com/fffelix-huang/tokenfetch/internal/report"
 	"github.com/fffelix-huang/tokenfetch/internal/service"
 	"github.com/fffelix-huang/tokenfetch/internal/source/claudecode"
+	"github.com/fffelix-huang/tokenfetch/internal/source/codex"
 	"github.com/fffelix-huang/tokenfetch/internal/store"
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
@@ -35,7 +36,7 @@ func main() {
 	}
 }
 
-const usageText = `Tokenfetch gives summary of Claude Code token usage and estimated API cost.
+const usageText = `Tokenfetch gives summary of Claude Code and Codex token usage and estimated API cost.
 
 Usage: tokenfetch [range] [flags]
        tokenfetch <command> [flags]
@@ -43,7 +44,7 @@ Usage: tokenfetch [range] [flags]
 Commands:
   ingest               record new usage without printing a report
   service install      run ingest periodically, so usage is recorded even
-                       when tokenfetch isn't (Claude Code deletes old logs)
+                       when tokenfetch isn't (agents delete old logs)
   service uninstall    remove the periodic job; recorded usage is kept
   service status       show whether the periodic job is installed and healthy
 
@@ -74,6 +75,7 @@ Environment Variables:
                        (default: %s)
   CLAUDE_CONFIG_DIR    Claude Code config dirs to read, comma-separated
                        (default: ~/.claude and ~/.config/claude)
+  CODEX_HOME           Codex home dir to read (default: ~/.codex)
   NO_COLOR             disable colors when set (unless --color=always)
 `
 
@@ -206,7 +208,7 @@ func openStore() (*store.Store, error) {
 }
 
 func ingestAll(st *store.Store) (ingest.Stats, error) {
-	stats, err := ingest.Run(st, []usage.Source{claudecode.New()})
+	stats, err := ingest.Run(st, []usage.Source{claudecode.New(), codex.New()})
 	if err != nil {
 		return stats, fmt.Errorf("ingest: %w", err)
 	}
@@ -263,8 +265,8 @@ Flags:
   --interval=EVERY     how often to run (hourly|daily|weekly, default: hourly)
 
 The job runs ` + "`tokenfetch ingest`" + ` as a launchd user agent on macOS, or a
-systemd user timer on Linux, and inherits TOKENFETCH_DATA_DIR and
-CLAUDE_CONFIG_DIR as currently set.
+systemd user timer on Linux, and inherits TOKENFETCH_DATA_DIR,
+CLAUDE_CONFIG_DIR and CODEX_HOME as currently set.
 `
 
 // runService dispatches the service subcommands.

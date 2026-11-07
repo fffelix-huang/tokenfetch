@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -279,25 +281,38 @@ type Group struct {
 	Agent    string
 	Speed    string
 	Geo      string
-	// LongPrompt: every event's prompt (input + cache read + cache write)
-	// was over the threshold passed to Groups, for per-request price tiers.
-	LongPrompt bool
+	// PromptOver is the largest threshold passed to Groups that every event's
+	// prompt (input + cache read + cache write) exceeded, 0 for none; it lets
+	// per-request price tiers survive aggregation.
+	PromptOver int64
 	usage.Tokens
 	WebSearches int64
 	Messages    int64
 }
 
-// Groups returns slot groups with ts in [from, to). Events whose prompt is
-// over longPrompt tokens group apart from the rest (see Group.LongPrompt).
-func (s *Store) Groups(from, to time.Time, longPrompt int64) ([]Group, error) {
+// Groups returns slot groups with ts in [from, to). Events also group by the
+// largest of thresholds their prompt exceeds (see Group.PromptOver).
+func (s *Store) Groups(from, to time.Time, thresholds []int64) ([]Group, error) {
+	bucket := "0"
+	if len(thresholds) > 0 {
+		sorted := slices.Clone(thresholds)
+		slices.Sort(sorted)
+		var b strings.Builder
+		b.WriteString("CASE")
+		for _, t := range slices.Backward(sorted) {
+			fmt.Fprintf(&b, " WHEN input + cache_read + cache_write_5m + cache_write_1h > %d THEN %d", t, t)
+		}
+		b.WriteString(" ELSE 0 END")
+		bucket = b.String()
+	}
 	rows, err := s.db.Query(`
 SELECT ts / ?1 * ?1 AS slot, provider, model, project, skill, plugin, agent, speed, geo,
-	input + cache_read + cache_write_5m + cache_write_1h > ?4 AS long_prompt,
+	`+bucket+` AS prompt_over,
 	SUM(input), SUM(output), SUM(cache_read), SUM(cache_write_5m), SUM(cache_write_1h),
 	SUM(web_searches), COUNT(*)
 FROM events WHERE ts >= ?2 AND ts < ?3
-GROUP BY slot, provider, model, project, skill, plugin, agent, speed, geo, long_prompt
-ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix(), longPrompt)
+GROUP BY slot, provider, model, project, skill, plugin, agent, speed, geo, prompt_over
+ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +321,7 @@ ORDER BY slot`, SlotSeconds, from.Unix(), to.Unix(), longPrompt)
 	for rows.Next() {
 		var g Group
 		var h int64
-		if err := rows.Scan(&h, &g.Provider, &g.Model, &g.Project, &g.Skill, &g.Plugin, &g.Agent, &g.Speed, &g.Geo, &g.LongPrompt,
+		if err := rows.Scan(&h, &g.Provider, &g.Model, &g.Project, &g.Skill, &g.Plugin, &g.Agent, &g.Speed, &g.Geo, &g.PromptOver,
 			&g.Input, &g.Output, &g.CacheRead, &g.CacheWrite5m, &g.CacheWrite1h, &g.WebSearches, &g.Messages); err != nil {
 			return nil, err
 		}

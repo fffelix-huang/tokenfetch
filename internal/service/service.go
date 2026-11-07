@@ -90,7 +90,7 @@ func (c Config) interval() Interval {
 
 // envKeys are the variables a scheduled run needs to see the same data as the
 // interactive one; a job inherits almost nothing from the user's shell.
-var envKeys = []string{"TOKENFETCH_DATA_DIR", "CLAUDE_CONFIG_DIR"}
+var envKeys = []string{"TOKENFETCH_DATA_DIR", "CLAUDE_CONFIG_DIR", "CODEX_HOME"}
 
 // EnvFromOS captures the tokenfetch variables currently set, so a job installed
 // from a shell that overrides them keeps reading and writing the same places.
@@ -185,7 +185,7 @@ func esc(s string) string {
 func renderSystemdService(cfg Config) []byte {
 	var b bytes.Buffer
 	b.WriteString("[Unit]\n")
-	b.WriteString("Description=Record Claude Code token usage\n")
+	b.WriteString("Description=Record AI agent token usage\n")
 	b.WriteString("Documentation=https://github.com/fffelix-huang/tokenfetch\n\n")
 	b.WriteString("[Service]\n")
 	b.WriteString("Type=oneshot\n")
@@ -203,7 +203,7 @@ func renderSystemdService(cfg Config) []byte {
 func renderSystemdTimer(cfg Config) []byte {
 	var b bytes.Buffer
 	b.WriteString("[Unit]\n")
-	b.WriteString("Description=Record Claude Code token usage periodically\n\n")
+	b.WriteString("Description=Record AI agent token usage periodically\n\n")
 	b.WriteString("[Timer]\n")
 	fmt.Fprintf(&b, "OnCalendar=%s\n", cfg.interval())
 	b.WriteString("Persistent=true\n")
