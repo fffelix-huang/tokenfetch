@@ -16,6 +16,9 @@ type Rates struct {
 	Input, Output, CacheWrite5m, CacheWrite1h, CacheRead float64
 	// Fast is the speed:"fast" base rate set, nil if unsupported.
 	Fast *Rates
+	// LongPrompt is the rate set for requests whose prompt (input + cache
+	// read + cache write) exceeds LongPromptTokens; nil = flat pricing.
+	LongPrompt *Rates
 	// GeoPremium: inference_geo "us" costs 1.1x (Claude 4.6+).
 	GeoPremium bool
 }
@@ -39,6 +42,11 @@ func opus55FastModeRates() *Rates {
 
 func withGeo(r Rates) Rates { r.GeoPremium = true; return r }
 
+func withLongPrompt(r, long Rates) Rates { r.LongPrompt = &long; return r }
+
+// LongPromptTokens is the prompt size above which LongPrompt rates apply.
+const LongPromptTokens = 100_000
+
 // table is keyed by normalized model id (see Normalize).
 var table = map[string]Rates{
 	"claude-fable-5-1":  withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
@@ -58,9 +66,8 @@ var table = map[string]Rates{
 	"claude-sonnet-4-6": withGeo(std(3, 15)),
 	"claude-sonnet-4-5": std(3, 15),
 	"claude-sonnet-4":   std(3, 15),
-	// Haiku 5.5 is priced by prompt length; these are the <=100k rates (5x above it,
-	// which needs per-request prompt size and so is not applied).
-	"claude-haiku-5-5": withGeo(std(0.1, 0.5)),
+	// Haiku 5.5 is priced per request by prompt length: 5x on every category over 100k.
+	"claude-haiku-5-5": withGeo(withLongPrompt(std(0.1, 0.5), std(0.5, 2.5))),
 	"claude-haiku-4-5": std(1, 5),
 	"claude-3-5-haiku": std(0.8, 4),
 }
@@ -93,19 +100,26 @@ func Lookup(model string) (Rates, bool) {
 	return r, ok
 }
 
-// Cost prices tokens that share model, speed and geo; ok=false if the model is unknown.
-func Cost(model, speed, geo string, t usage.Tokens, webSearches int64) (float64, bool) {
+// Cost prices tokens that share model, speed, geo and prompt-length tier
+// (longPrompt: each request's prompt was over LongPromptTokens); ok=false if
+// the model is unknown.
+func Cost(model, speed, geo string, longPrompt bool, t usage.Tokens, webSearches int64) (float64, bool) {
 	r, ok := Lookup(model)
 	if !ok {
 		return 0, false
 	}
-	return costOf(r, speed, geo, t, webSearches), true
+	return costOf(r, speed, geo, longPrompt, t, webSearches), true
 }
 
-func costOf(r Rates, speed, geo string, t usage.Tokens, webSearches int64) float64 {
-	if speed == "fast" && r.Fast != nil {
+func costOf(r Rates, speed, geo string, longPrompt bool, t usage.Tokens, webSearches int64) float64 {
+	geoPremium := r.GeoPremium
+	switch {
+	case speed == "fast" && r.Fast != nil:
 		r = *r.Fast
+	case longPrompt && r.LongPrompt != nil:
+		r = *r.LongPrompt
 	}
+	r.GeoPremium = geoPremium
 	usd := (float64(t.Input)*r.Input +
 		float64(t.Output)*r.Output +
 		float64(t.CacheWrite5m)*r.CacheWrite5m +

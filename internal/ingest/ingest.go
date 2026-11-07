@@ -27,12 +27,8 @@ func Run(st *store.Store, sources []usage.Source) (Stats, error) {
 	if err != nil {
 		return stats, err
 	}
-	tx, err := st.Begin()
-	if err != nil {
-		return stats, err
-	}
-	defer tx.Rollback()
-
+	// One transaction per file: a failure keeps the files already done, and a
+	// long --rebuild doesn't hold the write lock against a concurrent run.
 	for _, src := range sources {
 		files, err := src.Files()
 		if err != nil {
@@ -51,17 +47,37 @@ func Run(st *store.Store, sources []usage.Source) (Stats, error) {
 			if info.Size() < offset {
 				offset = 0 // truncated or replaced: reparse; upserts are idempotent
 			}
-			newOffset, err := ingestFile(tx, src, path, offset, &stats)
-			if err != nil {
-				return stats, err
-			}
-			stats.FilesScanned++
-			if err := tx.SetFileState(path, store.FileState{Offset: newOffset, Size: info.Size(), MTime: info.ModTime()}); err != nil {
+			if err := ingestOne(st, src, path, offset, info, &stats); err != nil {
 				return stats, err
 			}
 		}
 	}
-	return stats, tx.Commit()
+	return stats, nil
+}
+
+// ingestOne commits one file's new events together with its offset, so the
+// two never disagree. Stats count only committed work.
+func ingestOne(st *store.Store, src usage.Source, path string, offset int64, info os.FileInfo, stats *Stats) error {
+	tx, err := st.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var fs Stats
+	newOffset, err := ingestFile(tx, src, path, offset, &fs)
+	if err != nil {
+		return err
+	}
+	if err := tx.SetFileState(path, store.FileState{Offset: newOffset, Size: info.Size(), MTime: info.ModTime()}); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	stats.FilesScanned++
+	stats.Events += fs.Events
+	stats.BadLines += fs.BadLines
+	return nil
 }
 
 func ingestFile(tx *store.Tx, src usage.Source, path string, offset int64, stats *Stats) (int64, error) {

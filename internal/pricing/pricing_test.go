@@ -44,11 +44,26 @@ func TestCost(t *testing.T) {
 		{"fast ignored when unsupported", "claude-opus-4-7", "fast", "", usage.Tokens{Output: 1e6}, 0, 25},
 		{"web search", "claude-haiku-4-5", "", "", usage.Tokens{}, 3, 0.03},
 	} {
-		got, ok := Cost(tc.model, tc.speed, tc.geo, tc.tokens, tc.searches)
+		got, ok := Cost(tc.model, tc.speed, tc.geo, false, tc.tokens, tc.searches)
 		if assert.True(t, ok, tc.name) {
 			assert.InDelta(t, tc.want, got, 1e-9, tc.name)
 		}
 	}
-	_, ok := Cost("gpt-5", "", "", usage.Tokens{Input: 1}, 0)
+	_, ok := Cost("gpt-5", "", "", false, usage.Tokens{Input: 1}, 0)
 	assert.False(t, ok, "unknown model should not be priced")
+}
+
+// Haiku 5.5 prompts over 100k tokens pay 5x on every category; geo stacks.
+func TestCostLongPrompt(t *testing.T) {
+	tok := usage.Tokens{Input: 1e6, Output: 1e6, CacheRead: 1e6, CacheWrite5m: 1e6, CacheWrite1h: 1e6}
+	short, _ := Cost("claude-haiku-5-5", "", "", false, tok, 0)
+	long, _ := Cost("claude-haiku-5-5", "", "", true, tok, 0)
+	assert.InDelta(t, 0.1+0.5+0.01+0.125+0.2, short, 1e-9)
+	assert.InDelta(t, 0.5+2.5+0.05+0.625+1, long, 1e-9)
+	longUS, _ := Cost("claude-haiku-5-5", "", "us", true, tok, 0)
+	assert.InDelta(t, long*1.1, longUS, 1e-9)
+	// Flat-priced models ignore the flag.
+	a, _ := Cost("claude-opus-5-5", "", "", false, tok, 0)
+	b, _ := Cost("claude-opus-5-5", "", "", true, tok, 0)
+	assert.Equal(t, a, b)
 }

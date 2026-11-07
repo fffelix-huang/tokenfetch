@@ -84,3 +84,16 @@ func TestFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, files, 2, "want 2 jsonl files")
 }
+
+// Lines that can't be keyed or placed in time are malformed, not silently
+// merged into one event (empty id) or hidden before the epoch (no timestamp).
+func TestParseLineRejectsUnkeyedOrUntimed(t *testing.T) {
+	s := &Source{}
+	for name, l := range map[string]string{
+		"no id":        `{"type":"assistant","timestamp":"2026-09-16T14:58:35Z","message":{"model":"claude-opus-5","usage":{"output_tokens":1}}}`,
+		"no timestamp": `{"type":"assistant","message":{"id":"msg_1","model":"claude-opus-5","usage":{"output_tokens":1}}}`,
+	} {
+		_, _, err := s.ParseLine([]byte(l))
+		assert.Error(t, err, name)
+	}
+}

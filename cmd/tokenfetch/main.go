@@ -154,9 +154,11 @@ func run() error {
 		}
 	}
 
+	// A failed ingest (e.g. the periodic job holding the write lock) only
+	// means newest usage is missing; the stored history still reports.
 	stats, err := ingestAll(st)
 	if err != nil {
-		return err
+		fmt.Fprintf(os.Stderr, "tokenfetch: %v; showing recorded usage only\n", err)
 	}
 	if stats.BadLines > 0 {
 		fmt.Fprintf(os.Stderr, "tokenfetch: skipped %d malformed log lines\n", stats.BadLines)
@@ -314,7 +316,7 @@ func serviceInstall(every service.Interval) error {
 	}
 	// `go run` builds into a temp dir that is deleted right after, which would
 	// install a job pointing at a binary that no longer exists.
-	if tmp := os.TempDir(); strings.HasPrefix(exe, tmp) {
+	if underTempDir(exe) {
 		return fmt.Errorf("refusing to schedule %s: install tokenfetch first (make build, go install or brew install)", exe)
 	}
 	info, err := service.Install(service.Config{Exe: exe, Interval: every, Env: service.EnvFromOS()})
@@ -332,6 +334,23 @@ func serviceInstall(every service.Interval) error {
 		fmt.Printf("  log:   journalctl --user -u tokenfetch\n")
 	}
 	return nil
+}
+
+// underTempDir reports whether path is inside os.TempDir, comparing both
+// with symlinks resolved: on macOS $TMPDIR is /var/folders/… while the
+// resolved executable is /private/var/folders/….
+func underTempDir(path string) bool {
+	tmps := []string{os.TempDir()}
+	if resolved, err := filepath.EvalSymlinks(tmps[0]); err == nil {
+		tmps = append(tmps, resolved)
+	}
+	for _, tmp := range tmps {
+		rel, err := filepath.Rel(tmp, path)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func serviceUninstall() error {
