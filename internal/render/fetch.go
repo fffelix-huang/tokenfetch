@@ -127,13 +127,9 @@ func sidePanel(r *report.Report, height int) string {
 		name  func(string) string
 	}
 	var secs []section
-	// One provider is already implied by its models; list them only when mixed.
-	var providers []report.Row
-	if len(r.Providers) > 1 {
-		providers = r.Providers
-	}
+	// Harness and model are independent: one harness can run several vendors' models.
 	for _, s := range []section{
-		{"Providers", providers, ident},
+		{"Harnesses", r.Harnesses, ident},
 		{"Models", r.Models, ident},
 		{"Projects", r.Projects, shortPath},
 		{"Skills", r.Skills, ident},

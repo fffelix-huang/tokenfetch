@@ -3,9 +3,9 @@ package usage
 
 import "time"
 
-// Event is one billed model response, normalized across providers.
+// Event is one billed model response, normalized across harnesses.
 type Event struct {
-	Provider  string // e.g. "claude-code"
+	Provider  string // harness that logged it, e.g. "claude-code", "codex"; not the model vendor
 	MessageID string // dedup key, unique within Provider
 	Timestamp time.Time
 
@@ -48,7 +48,7 @@ func (t *Tokens) Add(o Tokens) {
 
 // Source discovers and parses one agent's local usage logs.
 type Source interface {
-	// Name is the provider id stored on events.
+	// Name is the harness id stored on events (Event.Provider).
 	Name() string
 	// Files lists log files to scan. Missing data dir is not an error.
 	Files() ([]string, error)

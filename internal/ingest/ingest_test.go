@@ -118,7 +118,7 @@ func TestContextReplayAcrossRuns(t *testing.T) {
 	assert.EqualValues(t, 2, rep.Models[0].Messages, "both responses carry the turn's model")
 	require.Len(t, rep.Projects, 1)
 	assert.Equal(t, "/p", rep.Projects[0].Name)
-	require.Len(t, rep.Providers, 1)
-	assert.Equal(t, codex.Provider, rep.Providers[0].Name)
+	require.Len(t, rep.Harnesses, 1)
+	assert.Equal(t, codex.Provider, rep.Harnesses[0].Name)
 	assert.EqualValues(t, 60+40+10+200+20, rep.Total)
 }

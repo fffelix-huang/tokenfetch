@@ -67,7 +67,7 @@ type Report struct {
 	Sessions    int64        `json:"sessions"`
 	WebSearches int64        `json:"web_searches"`
 
-	Providers []Row `json:"providers"` // "claude-code", "codex"
+	Harnesses []Row `json:"harnesses"` // agent tool that logged the usage: "claude-code", "codex"; independent of model
 	Models    []Row `json:"models"`
 	Projects  []Row `json:"projects"`
 	Skills    []Row `json:"skills"`  // excludes usage with no skill
@@ -124,7 +124,7 @@ func Build(st *store.Store, r Range, loc *time.Location) (*Report, error) {
 		rep.Messages += g.Messages
 		rep.WebSearches += g.WebSearches
 
-		add("provider", g.Provider, g, cost)
+		add("harness", g.Provider, g, cost)
 		add("model", g.Model, g, cost)
 		add("project", g.Project, g, cost)
 		add("agent", g.Agent, g, cost)
@@ -153,7 +153,7 @@ func Build(st *store.Store, r Range, loc *time.Location) (*Report, error) {
 		d.CostUSD += cost
 	}
 
-	rep.Providers = sorted(dims["provider"])
+	rep.Harnesses = sorted(dims["harness"])
 	rep.Models = sorted(dims["model"])
 	rep.Projects = sorted(dims["project"])
 	rep.Skills = sorted(dims["skill"])
