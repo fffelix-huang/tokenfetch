@@ -99,7 +99,7 @@ func infoLines(r *report.Report) string {
 	period := from.Format("Jan 2, 2006") + " – " + lastDay(r).Format("Jan 2, 2006")
 	kv("Period", period)
 	cacheW := r.Tokens.CacheWrite5m + r.Tokens.CacheWrite1h
-	kv("Tokens", compact(r.Total))
+	kv("Tokens", compact(r.Total)+mutedStyle.Render(cachedShare(r)))
 	kv("  Input", compact(r.Tokens.Input+r.Tokens.CacheRead+cacheW))
 	sub := func(k string, v int64) { kv("", mutedStyle.Render(fmt.Sprintf("%-12s", k))+compact(v)) }
 	sub("uncached", r.Tokens.Input)
@@ -184,6 +184,15 @@ func sidePanel(r *report.Report, height int) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// cachedShare is the cache-read share of all tokens, e.g. " · 97.0% cached";
+// "" when there is no usage.
+func cachedShare(r *report.Report) string {
+	if r.Total <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" · %.1f%% cached", float64(r.Tokens.CacheRead)/float64(r.Total)*100)
 }
 
 func compact(n int64) string {
