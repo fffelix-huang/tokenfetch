@@ -1,4 +1,6 @@
-// Code generated from https://developers.openai.com/api/docs/pricing (fetched 2026-11-08); DO NOT EDIT by hand without re-checking the page.
+// OpenAI list prices extracted from https://developers.openai.com/api/docs/pricing
+// (fetched 2026-11-08). No generator is kept: the page's markup changes, so
+// re-extract or edit by hand, re-checking every tier against the page.
 
 package pricing
 
