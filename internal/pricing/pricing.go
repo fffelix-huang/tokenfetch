@@ -25,8 +25,8 @@ type Rates struct {
 	// Ultrafast is the speed:"ultrafast" rate set (OpenAI Ultrafast mode), nil if unsupported.
 	Ultrafast *Rates
 	// LongPrompt is the rate set for requests whose prompt (input + cache read
-	// + cache write) exceeds LongPromptAbove; nil = flat pricing. Fast and
-	// Flex carry their own LongPrompt, applied at the parent's threshold.
+	// + cache write) exceeds LongPromptAbove; nil = flat pricing. Fast, Flex
+	// and Ultrafast carry their own LongPrompt, applied at the parent's threshold.
 	LongPrompt      *Rates
 	LongPromptAbove int64
 	// GeoPremium: inference_geo "us" costs 1.1x (Claude 4.6+).

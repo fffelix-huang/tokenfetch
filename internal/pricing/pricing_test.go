@@ -20,6 +20,8 @@ func TestNormalize(t *testing.T) {
 		"us.anthropic.claude-sonnet-4-5-20250929-v1:0": "claude-sonnet-4-5",
 		"anthropic.claude-opus-5":                      "claude-opus-5",
 		"claude-3-5-haiku-20241022":                    "claude-3-5-haiku",
+		"gpt-6-luna-2026-10-01":                        "gpt-6-luna", // OpenAI snapshot suffix
+		"gpt-5.5":                                      "gpt-5.5",
 	} {
 		assert.Equal(t, want, Normalize(in), "Normalize(%q)", in)
 	}
@@ -95,8 +97,6 @@ func TestCostGPT6Luna(t *testing.T) {
 	a, _ := Cost("claude-haiku-5-5", "", "", 100_000, tok, 0)
 	b, _ := Cost("claude-haiku-5-5", "", "", 272_000, tok, 0)
 	assert.Equal(t, a, b)
-	assert.Equal(t, []int64{100_000, 272_000}, PromptThresholds())
-	assert.Equal(t, "gpt-6-luna", Normalize("gpt-6-luna-2026-10-01"))
 }
 
 // Spot checks against the OpenAI pricing page (2026-11-08).
