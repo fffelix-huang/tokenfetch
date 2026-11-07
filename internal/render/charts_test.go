@@ -187,3 +187,23 @@ func TestSidePanelHarnessesAboveModels(t *testing.T) {
 	assert.Less(t, h, m, "Harnesses should precede Models:\n%s", out)
 	assert.Contains(t, out, "claude-code")
 }
+
+func TestCachedShare(t *testing.T) {
+	for _, tc := range []struct {
+		read, total int64
+		want        string
+	}{
+		{970, 1000, " · 97.0% cached"},
+		{5, 100, " · 5.0% cached"}, // single digit: no padding
+		{1, 3, " · 33.3% cached"},
+		{0, 10, " · 0.0% cached"},
+		{0, 0, ""}, // no usage: nothing to show
+	} {
+		r := &report.Report{Total: tc.total}
+		r.Tokens.CacheRead = tc.read
+		assert.Equal(t, tc.want, cachedShare(r), "%d/%d", tc.read, tc.total)
+	}
+	r := &report.Report{Total: 1000}
+	r.Tokens.CacheRead = 970
+	assert.Contains(t, infoLines(r), "97.0% cached", "shown on the Tokens line")
+}
