@@ -52,7 +52,14 @@ Pipeline: `usage.Source → ingest → store (SQLite) → report → render`
 
 ## Release
 
-- Manual: bump `var version` in `cmd/tokenfetch/main.go`, commit, `git tag -s vX.Y.Z -m vX.Y.Z`, `git push origin master vX.Y.Z` → `.github/workflows/release.yml`:
+- Manual, directly on master (no PR), clean tree, after CI green on master:
+  ```sh
+  # cmd/tokenfetch/main.go: only change `var version = "X.Y.Z"`
+  git commit --no-gpg-sign -am "release: X.Y.Z"   # message exactly this, nothing else in the commit
+  git tag -a vX.Y.Z -m vX.Y.Z                      # annotated, unsigned (v0.2.0+); tag msg = tag name
+  git push origin master vX.Y.Z
+  ```
+  Semver without `v` in code/commit, with `v` in the tag. New features → minor bump (every release so far: 0.1.0 … 0.6.0); fixes only → patch. GitHub Release name = `X.Y.Z`, body = GoReleaser changelog of commits since last tag. Pushing the tag triggers `.github/workflows/release.yml`:
   1. `release` job: fails if tag ≠ `var version`, tests, GoReleaser (`.goreleaser.yml`) → GitHub Release with darwin/linux × amd64/arm64 tarballs. No Homebrew config in GoReleaser.
   2. `homebrew` job: renders `.github/homebrew/tokenfetch.rb` (`@VERSION@`, `@SHA256@` of the tag's source tarball) and pushes `Formula/tokenfetch.rb` to `fffelix-huang/homebrew-tap` (secret `HOMEBREW_TAP_TOKEN`). Formula builds from source, not a cask — no quarantine/xattr handling needed.
 - Version (fzf style): `var version = "X.Y.Z"`, `var revision = "devel"`. GoReleaser sets `-X main.revision={{.ShortCommit}}`; the formula sets `-X main.revision=#{tap.user}` (fzf style: `fffelix-huang` from our tap). `--version` prints `0.1.0 (devel|abc1234|fffelix-huang)`.
