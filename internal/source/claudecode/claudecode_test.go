@@ -7,24 +7,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
 
 func parseFixture(t *testing.T) []usage.Event {
 	t.Helper()
 	f, err := os.Open("testdata/session.jsonl")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer f.Close()
 	s := &Source{}
 	var evs []usage.Event
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		ev, ok, err := s.ParseLine(sc.Bytes())
-		if err != nil {
-			t.Fatalf("ParseLine: %v", err)
-		}
+		require.NoError(t, err, "ParseLine")
 		if ok {
 			evs = append(evs, ev)
 		}
@@ -34,11 +33,8 @@ func parseFixture(t *testing.T) []usage.Event {
 
 func TestParseLine(t *testing.T) {
 	evs := parseFixture(t)
-	if len(evs) != 4 {
-		t.Fatalf("got %d events, want 4 (user, system, synthetic skipped)", len(evs))
-	}
+	require.Len(t, evs, 4, "user, system, synthetic skipped")
 
-	final := evs[1]
 	want := usage.Event{
 		Provider:    Provider,
 		MessageID:   "msg_1",
@@ -53,26 +49,23 @@ func TestParseLine(t *testing.T) {
 		Tokens:      usage.Tokens{Input: 2, Output: 372, CacheRead: 27373, CacheWrite1h: 11084},
 		WebSearches: 1,
 	}
-	if final != want {
-		t.Errorf("final line:\n got %+v\nwant %+v", final, want)
-	}
-	if evs[0].MessageID != evs[1].MessageID || evs[0].Output != 5 {
-		t.Errorf("partial streaming line should share id with partial output, got %+v", evs[0])
-	}
+	assert.Equal(t, want, evs[1], "final line")
+	// Partial streaming line shares id with the final one, with partial output.
+	assert.Equal(t, evs[1].MessageID, evs[0].MessageID)
+	assert.EqualValues(t, 5, evs[0].Output)
 }
 
 func TestParseLineLegacyCacheWrite(t *testing.T) {
 	ev := parseFixture(t)[2]
-	if ev.CacheWrite5m != 100 || ev.CacheWrite1h != 0 {
-		t.Errorf("unsplit cache_creation should count as 5m, got %+v", ev.Tokens)
-	}
+	// Unsplit cache_creation counts as 5m.
+	assert.EqualValues(t, 100, ev.CacheWrite5m)
+	assert.Zero(t, ev.CacheWrite1h)
 }
 
 func TestParseLineSubagentAndGeo(t *testing.T) {
 	ev := parseFixture(t)[3]
-	if ev.Agent != "general-purpose" || ev.Geo != "us" {
-		t.Errorf("got agent=%q geo=%q", ev.Agent, ev.Geo)
-	}
+	assert.Equal(t, "general-purpose", ev.Agent)
+	assert.Equal(t, "us", ev.Geo)
 }
 
 func TestFiles(t *testing.T) {
@@ -83,19 +76,11 @@ func TestFiles(t *testing.T) {
 		"projects/-home-u-proj/s1/subagents/agent-a1.meta.json",
 	} {
 		full := filepath.Join(root, p)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(full, nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, nil, 0o644))
 	}
 	s := &Source{Roots: []string{root, filepath.Join(root, "missing")}}
 	files, err := s.Files()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(files) != 2 {
-		t.Errorf("got %v, want 2 jsonl files", files)
-	}
+	require.NoError(t, err)
+	assert.Len(t, files, 2, "want 2 jsonl files")
 }
