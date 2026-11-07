@@ -1,8 +1,9 @@
 package pricing
 
 import (
-	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
@@ -19,9 +20,7 @@ func TestNormalize(t *testing.T) {
 		"anthropic.claude-opus-5":                      "claude-opus-5",
 		"claude-3-5-haiku-20241022":                    "claude-3-5-haiku",
 	} {
-		if got := Normalize(in); got != want {
-			t.Errorf("Normalize(%q) = %q, want %q", in, got, want)
-		}
+		assert.Equal(t, want, Normalize(in), "Normalize(%q)", in)
 	}
 }
 
@@ -46,11 +45,10 @@ func TestCost(t *testing.T) {
 		{"web search", "claude-haiku-4-5", "", "", usage.Tokens{}, 3, 0.03},
 	} {
 		got, ok := Cost(tc.model, tc.speed, tc.geo, tc.tokens, tc.searches)
-		if !ok || math.Abs(got-tc.want) > 1e-9 {
-			t.Errorf("%s: got %v (ok=%v), want %v", tc.name, got, ok, tc.want)
+		if assert.True(t, ok, tc.name) {
+			assert.InDelta(t, tc.want, got, 1e-9, tc.name)
 		}
 	}
-	if _, ok := Cost("gpt-5", "", "", usage.Tokens{Input: 1}, 0); ok {
-		t.Error("unknown model should not be priced")
-	}
+	_, ok := Cost("gpt-5", "", "", usage.Tokens{Input: 1}, 0)
+	assert.False(t, ok, "unknown model should not be priced")
 }

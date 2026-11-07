@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHeatLevelsDistinct(t *testing.T) {
@@ -14,9 +15,8 @@ func TestHeatLevelsDistinct(t *testing.T) {
 		seen := map[string]int{}
 		for l := 1; l < len(heatLvl); l++ {
 			cell := heatCell(l, 2)
-			if prev, dup := seen[cell]; dup {
-				t.Errorf("profile %v: levels %d and %d render identically: %q", p, prev, l, cell)
-			}
+			prev, dup := seen[cell]
+			assert.False(t, dup, "profile %v: levels %d and %d render identically: %q", p, prev, l, cell)
 			seen[cell] = l
 		}
 	}

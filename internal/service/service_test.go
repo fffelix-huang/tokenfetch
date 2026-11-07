@@ -4,43 +4,35 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseInterval(t *testing.T) {
 	for _, s := range []string{"hourly", "daily", "weekly"} {
-		if _, err := ParseInterval(s); err != nil {
-			t.Errorf("ParseInterval(%q): %v", s, err)
-		}
+		_, err := ParseInterval(s)
+		assert.NoError(t, err, "ParseInterval(%q)", s)
 	}
-	if _, err := ParseInterval("fortnightly"); err == nil {
-		t.Error("unknown interval should fail")
-	}
+	_, err := ParseInterval("fortnightly")
+	assert.Error(t, err, "unknown interval should fail")
 }
 
 func TestParseUnixTimestamp(t *testing.T) {
-	if got := parseUnixTimestamp("@1762232400\n"); !got.Equal(time.Unix(1762232400, 0)) {
-		t.Errorf("parseUnixTimestamp(@1762232400) = %v", got)
-	}
+	assert.True(t, parseUnixTimestamp("@1762232400\n").Equal(time.Unix(1762232400, 0)))
 	for _, s := range []string{"", "n/a", "@0", "1762232400", "Wed 2025-11-04 05:00:00 UTC"} {
-		if got := parseUnixTimestamp(s); !got.IsZero() {
-			t.Errorf("parseUnixTimestamp(%q) = %v, want zero", s, got)
-		}
+		assert.Zero(t, parseUnixTimestamp(s), "parseUnixTimestamp(%q)", s)
 	}
 }
 
 func TestIntervalUnit(t *testing.T) {
 	for i, want := range map[Interval]string{Hourly: "hour", Daily: "day", Weekly: "week"} {
-		if got := i.Unit(); got != want {
-			t.Errorf("%s.Unit() = %q, want %q", i, got, want)
-		}
+		assert.Equal(t, want, i.Unit(), "%s.Unit()", i)
 	}
 }
 
 func TestIntervalSeconds(t *testing.T) {
 	for i, want := range map[Interval]int{Hourly: 3600, Daily: 86400, Weekly: 604800} {
-		if got := i.Seconds(); got != want {
-			t.Errorf("%s.Seconds() = %d, want %d", i, got, want)
-		}
+		assert.Equal(t, want, i.Seconds(), "%s.Seconds()", i)
 	}
 }
 
@@ -62,24 +54,16 @@ func TestRenderPlist(t *testing.T) {
 		"<key>TOKENFETCH_DATA_DIR</key>\n\t\t<string>/tmp/tf</string>",
 		"<string>/tmp/tokenfetch.log</string>",
 	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("plist missing %q:\n%s", want, got)
-		}
+		assert.Contains(t, got, want)
 	}
-	if strings.Contains(got, "home & brew") {
-		t.Error("plist left a raw & in a path")
-	}
+	assert.NotContains(t, got, "home & brew", "plist left a raw & in a path")
 }
 
 // No env set: the dict is omitted rather than written empty.
 func TestRenderPlistNoEnv(t *testing.T) {
 	got := string(renderPlist(Config{Exe: "/usr/local/bin/tokenfetch"}, "/tmp/log"))
-	if strings.Contains(got, "EnvironmentVariables") {
-		t.Errorf("empty env should be omitted:\n%s", got)
-	}
-	if !strings.Contains(got, "<integer>3600</integer>") {
-		t.Error("zero Interval should default to hourly")
-	}
+	assert.NotContains(t, got, "EnvironmentVariables", "empty env should be omitted")
+	assert.Contains(t, got, "<integer>3600</integer>", "zero Interval should default to hourly")
 }
 
 func TestRenderSystemdUnits(t *testing.T) {
@@ -94,15 +78,11 @@ func TestRenderSystemdUnits(t *testing.T) {
 		`Environment="TOKENFETCH_DATA_DIR=/tmp/tf"`,
 		"Type=oneshot",
 	} {
-		if !strings.Contains(svc, want) {
-			t.Errorf("service unit missing %q:\n%s", want, svc)
-		}
+		assert.Contains(t, svc, want, "service unit")
 	}
 	timer := string(renderSystemdTimer(cfg))
 	for _, want := range []string{"OnCalendar=weekly", "Persistent=true", "WantedBy=timers.target"} {
-		if !strings.Contains(timer, want) {
-			t.Errorf("timer unit missing %q:\n%s", want, timer)
-		}
+		assert.Contains(t, timer, want, "timer unit")
 	}
 }
 
@@ -110,7 +90,5 @@ func TestRenderSystemdUnits(t *testing.T) {
 func TestRenderEnvSorted(t *testing.T) {
 	cfg := Config{Exe: "tf", Env: map[string]string{"TOKENFETCH_DATA_DIR": "b", "CLAUDE_CONFIG_DIR": "a"}}
 	svc := string(renderSystemdService(cfg))
-	if strings.Index(svc, "CLAUDE_CONFIG_DIR") > strings.Index(svc, "TOKENFETCH_DATA_DIR") {
-		t.Errorf("env not sorted:\n%s", svc)
-	}
+	assert.Less(t, strings.Index(svc, "CLAUDE_CONFIG_DIR"), strings.Index(svc, "TOKENFETCH_DATA_DIR"), "env not sorted:\n%s", svc)
 }
