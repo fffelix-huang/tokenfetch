@@ -70,7 +70,7 @@ func TestParseLineTurnContext(t *testing.T) {
 }
 
 func TestSpeed(t *testing.T) {
-	for tier, want := range map[string]string{"": "", "default": "", "flex": "flex", "fast": "fast", "priority": "fast"} {
+	for tier, want := range map[string]string{"": "", "default": "", "flex": "flex", "fast": "fast", "priority": "fast", "ultrafast": "ultrafast"} {
 		assert.Equal(t, want, speed(tier), "tier %q", tier)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fffelix-huang/tokenfetch/internal/usage"
 )
@@ -49,7 +50,7 @@ func TestCost(t *testing.T) {
 			assert.InDelta(t, tc.want, got, 1e-9, tc.name)
 		}
 	}
-	_, ok := Cost("gpt-5", "", "", 0, usage.Tokens{Input: 1}, 0)
+	_, ok := Cost("llama-4-scout", "", "", 0, usage.Tokens{Input: 1}, 0)
 	assert.False(t, ok, "unknown model should not be priced")
 }
 
@@ -96,4 +97,69 @@ func TestCostGPT6Luna(t *testing.T) {
 	assert.Equal(t, a, b)
 	assert.Equal(t, []int64{100_000, 272_000}, PromptThresholds())
 	assert.Equal(t, "gpt-6-luna", Normalize("gpt-6-luna-2026-10-01"))
+}
+
+// Spot checks against the OpenAI pricing page (2026-11-08).
+func TestOpenAITableSpotChecks(t *testing.T) {
+	r := func(model string) Rates {
+		t.Helper()
+		v, ok := Lookup(model)
+		require.True(t, ok, model)
+		return v
+	}
+	codex := r("gpt-5.3-codex")
+	assert.Equal(t, Rates{Input: 1.75, CacheRead: 0.175, CacheWrite5m: 1.75, CacheWrite1h: 1.75, Output: 14,
+		Fast: &Rates{Input: 3.5, CacheRead: 0.35, CacheWrite5m: 3.5, CacheWrite1h: 3.5, Output: 28}}, codex)
+	astra := r("gpt-6-astra")
+	require.NotNil(t, astra.Ultrafast)
+	require.NotNil(t, astra.Ultrafast.LongPrompt)
+	assert.Equal(t, 120.0, astra.Ultrafast.LongPrompt.Input)
+	assert.Equal(t, 450.0, astra.Ultrafast.LongPrompt.Output)
+	pro := r("gpt-5.5-pro") // no prompt caching: cached reads at full input price
+	assert.Equal(t, pro.Input, pro.CacheRead)
+	old := r("gpt-5") // no cache-write price: writes billed as input
+	assert.Equal(t, old.Input, old.CacheWrite5m)
+	assert.Equal(t, old.Input, old.CacheWrite1h)
+	require.NotNil(t, r("o3").Flex)
+	assert.Equal(t, 0.25, r("o3").Flex.CacheRead)
+	_, ok := Lookup("text-embedding-3-small")
+	assert.False(t, ok, "embeddings are not chat models")
+}
+
+// Invariants of the generated table: 12h write = 2.5x input wherever a write
+// price exists, long context only above 272K, keys already normalized.
+func TestOpenAITableInvariants(t *testing.T) {
+	var check func(name string, r *Rates)
+	check = func(name string, r *Rates) {
+		if r == nil {
+			return
+		}
+		if r.CacheWrite5m != r.Input {
+			assert.InDelta(t, r.Input*2.5, r.CacheWrite1h, 1e-9, "%s: 12h write", name)
+			assert.InDelta(t, r.Input*1.25, r.CacheWrite5m, 1e-9, "%s: 30m write", name)
+		}
+		check(name+"/long", r.LongPrompt)
+		check(name+"/flex", r.Flex)
+		check(name+"/fast", r.Fast)
+		check(name+"/ultrafast", r.Ultrafast)
+	}
+	require.GreaterOrEqual(t, len(openAI), 37)
+	for name, r := range openAI {
+		assert.Equal(t, name, Normalize(name), "key must be normalized")
+		if r.LongPrompt != nil {
+			assert.Equal(t, int64(272_000), r.LongPromptAbove, name)
+		}
+		check(name, &r)
+	}
+	assert.Equal(t, []int64{100_000, 272_000}, PromptThresholds())
+}
+
+func TestCostUltrafast(t *testing.T) {
+	tok := usage.Tokens{Input: 1e6, Output: 1e6}
+	got, ok := Cost("gpt-6.1-sol", "ultrafast", "", 0, tok, 0)
+	require.True(t, ok)
+	assert.InDelta(t, 12.0+60, got, 1e-9)
+	// Models without an Ultrafast tier fall back to Standard.
+	got, _ = Cost("gpt-6-luna", "ultrafast", "", 0, tok, 0)
+	assert.InDelta(t, 0.10+0.50, got, 1e-9)
 }

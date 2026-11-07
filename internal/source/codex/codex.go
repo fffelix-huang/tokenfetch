@@ -274,8 +274,8 @@ func speed(tier string) string {
 	switch tier {
 	case "fast", "priority":
 		return "fast"
-	case "flex":
-		return "flex"
+	case "flex", "ultrafast":
+		return tier
 	}
 	return ""
 }

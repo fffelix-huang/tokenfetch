@@ -22,6 +22,8 @@ type Rates struct {
 	Fast *Rates
 	// Flex is the speed:"flex" rate set (OpenAI Flex processing), nil if unsupported.
 	Flex *Rates
+	// Ultrafast is the speed:"ultrafast" rate set (OpenAI Ultrafast mode), nil if unsupported.
+	Ultrafast *Rates
 	// LongPrompt is the rate set for requests whose prompt (input + cache read
 	// + cache write) exceeds LongPromptAbove; nil = flat pricing. Fast and
 	// Flex carry their own LongPrompt, applied at the parent's threshold.
@@ -68,17 +70,8 @@ func PromptThresholds() []int64 {
 	return out
 }
 
-// gpt6Luna: Standard, Flex and Priority ("Fast") tiers, each with its own
-// >272K-input long-context rates.
-var gpt6Luna = withLongPrompt(Rates{
-	Input: 0.10, CacheRead: 0.01, CacheWrite5m: 0.125, CacheWrite1h: 0.25, Output: 0.50,
-	Flex: &Rates{Input: 0.05, CacheRead: 0.005, CacheWrite5m: 0.0625, CacheWrite1h: 0.125, Output: 0.25,
-		LongPrompt: &Rates{Input: 0.10, CacheRead: 0.01, CacheWrite5m: 0.125, CacheWrite1h: 0.25, Output: 0.375}},
-	Fast: &Rates{Input: 0.20, CacheRead: 0.02, CacheWrite5m: 0.25, CacheWrite1h: 0.50, Output: 1.00,
-		LongPrompt: &Rates{Input: 0.40, CacheRead: 0.04, CacheWrite5m: 0.50, CacheWrite1h: 1.00, Output: 1.50}},
-}, Rates{Input: 0.20, CacheRead: 0.02, CacheWrite5m: 0.25, CacheWrite1h: 0.50, Output: 0.75}, 272_000)
-
-// table is keyed by normalized model id (see Normalize).
+// table is keyed by normalized model id (see Normalize). Anthropic models are
+// listed here; OpenAI models are merged in from openai.go.
 var table = map[string]Rates{
 	"claude-fable-5-1":  withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
 	"claude-mythos-5-1": withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
@@ -101,10 +94,6 @@ var table = map[string]Rates{
 	"claude-haiku-5-5": withGeo(withLongPrompt(std(0.1, 0.5), std(0.5, 2.5), 100_000)),
 	"claude-haiku-4-5": std(1, 5),
 	"claude-3-5-haiku": std(0.8, 4),
-
-	// OpenAI (Codex). Only models whose every tier was checked; others stay
-	// unpriced until added.
-	"gpt-6-luna": gpt6Luna,
 }
 
 var (
@@ -154,6 +143,8 @@ func costOf(r Rates, speed, geo string, promptOver int64, t usage.Tokens, webSea
 		r = *r.Fast
 	case speed == "flex" && r.Flex != nil:
 		r = *r.Flex
+	case speed == "ultrafast" && r.Ultrafast != nil:
+		r = *r.Ultrafast
 	}
 	if long && r.LongPrompt != nil {
 		r = *r.LongPrompt
