@@ -1,7 +1,7 @@
 // Package pricing estimates USD cost from token counts using list prices.
 //
-// Sources: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-11-08),
-// https://developers.openai.com/api/docs/pricing (fetched 2026-11-08).
+// Sources: https://platform.claude.com/docs/en/about-claude/pricing (fetched 2026-11-14),
+// https://developers.openai.com/api/docs/pricing (fetched 2026-11-14).
 // Subscription users (Claude Pro/Max, ChatGPT plans) are not billed per token;
 // this is the API-equivalent cost.
 package pricing
@@ -50,6 +50,11 @@ func opus55FastModeRates() *Rates {
 	return &Rates{Input: 8, Output: 40, CacheWrite5m: 10, CacheWrite1h: 16, CacheRead: 0.4}
 }
 
+// fable52FastModeRates is 2x base, cache multipliers (0.025x read) applied on top of the fast base.
+func fable52FastModeRates() *Rates {
+	return &Rates{Input: 16, Output: 80, CacheWrite5m: 20, CacheWrite1h: 32, CacheRead: 0.4}
+}
+
 func withGeo(r Rates) Rates { r.GeoPremium = true; return r }
 
 func withLongPrompt(r, long Rates, above int64) Rates {
@@ -73,6 +78,8 @@ func PromptThresholds() []int64 {
 // table is keyed by normalized model id (see Normalize). Anthropic models are
 // listed here; OpenAI models are merged in from openai.go.
 var table = map[string]Rates{
+	"claude-fable-5-2":  withGeo(Rates{Input: 8, Output: 40, CacheWrite5m: 10, CacheWrite1h: 16, CacheRead: 0.2, Fast: fable52FastModeRates()}),
+	"claude-mythos-5-2": withGeo(Rates{Input: 8, Output: 40, CacheWrite5m: 10, CacheWrite1h: 16, CacheRead: 0.2, Fast: fable52FastModeRates()}),
 	"claude-fable-5-1":  withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
 	"claude-mythos-5-1": withGeo(Rates{Input: 10, Output: 50, CacheWrite5m: 12.5, CacheWrite1h: 20, CacheRead: 0.25}),
 	"claude-fable-5":    withGeo(std(10, 50)),

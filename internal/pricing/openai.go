@@ -1,5 +1,5 @@
 // OpenAI list prices extracted from https://developers.openai.com/api/docs/pricing
-// (fetched 2026-11-08). No generator is kept: the page's markup changes, so
+// (fetched 2026-11-14). No generator is kept: the page's markup changes, so
 // re-extract or edit by hand, re-checking every tier against the page.
 
 package pricing
@@ -99,6 +99,10 @@ var openAI = map[string]Rates{
 			LongPrompt: &Rates{Input: 5, CacheRead: 0.5, CacheWrite5m: 5, CacheWrite1h: 5, Output: 22.5}},
 		Fast: &Rates{Input: 12.5, CacheRead: 1.25, CacheWrite5m: 12.5, CacheWrite1h: 12.5, Output: 75},
 	},
+	"gpt-5.5-cyber-preview": {
+		Input: 12.5, CacheRead: 1.25, CacheWrite5m: 12.5, CacheWrite1h: 12.5, Output: 75,
+	},
+	// gpt-5.5-cyber: earlier name of gpt-5.5-cyber-preview, kept for older logs.
 	"gpt-5.5-cyber": {
 		Input: 12.5, CacheRead: 1.25, CacheWrite5m: 12.5, CacheWrite1h: 12.5, Output: 75,
 	},
@@ -149,6 +153,7 @@ var openAI = map[string]Rates{
 	},
 	"gpt-6-cyber": {
 		Input: 20, CacheRead: 2, CacheWrite5m: 25, CacheWrite1h: 50, Output: 100,
+		LongPromptAbove: openAILongContext, LongPrompt: &Rates{Input: 40, CacheRead: 4, CacheWrite5m: 40, CacheWrite1h: 40, Output: 150},
 	},
 	"gpt-6-luna": {
 		Input: 0.1, CacheRead: 0.01, CacheWrite5m: 0.125, CacheWrite1h: 0.25, Output: 0.5,

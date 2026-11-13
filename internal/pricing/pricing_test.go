@@ -41,6 +41,9 @@ func TestCost(t *testing.T) {
 		{"haiku 5.5 short prompt rates", "claude-haiku-5-5", "", "", usage.Tokens{Input: 1e6, Output: 1e6}, 0, 0.1 + 0.5},
 		{"opus 5 all categories", "claude-opus-5", "standard", "", mtok, 0, 5 + 25 + 0.5 + 6.25 + 10},
 		{"opus 5 fast", "claude-opus-5", "fast", "", mtok, 0, 10 + 50 + 1 + 12.5 + 20},
+		{"fable 5.2 all categories", "claude-fable-5-2", "", "", mtok, 0, 8 + 40 + 0.2 + 10 + 16},
+		{"mythos 5.2 fast", "claude-mythos-5-2", "fast", "", mtok, 0, 16 + 80 + 0.4 + 20 + 32},
+		{"fable 5.2 fast us geo", "claude-fable-5-2", "fast", "us", usage.Tokens{Output: 1e6}, 0, 88},
 		{"fable 5.1 cheap cache read", "claude-fable-5-1", "", "", usage.Tokens{CacheRead: 1e6}, 0, 0.25},
 		{"us geo premium", "claude-sonnet-5", "", "us", usage.Tokens{Input: 1e6}, 0, 2.2},
 		{"no geo premium pre-4.6", "claude-sonnet-4-5", "", "us", usage.Tokens{Input: 1e6}, 0, 3},
@@ -99,7 +102,7 @@ func TestCostGPT6Luna(t *testing.T) {
 	assert.Equal(t, a, b)
 }
 
-// Spot checks against the OpenAI pricing page (2026-11-08).
+// Spot checks against the OpenAI pricing page (2026-11-14).
 func TestOpenAITableSpotChecks(t *testing.T) {
 	r := func(model string) Rates {
 		t.Helper()
@@ -122,6 +125,10 @@ func TestOpenAITableSpotChecks(t *testing.T) {
 	assert.Equal(t, old.Input, old.CacheWrite1h)
 	require.NotNil(t, r("o3").Flex)
 	assert.Equal(t, 0.25, r("o3").Flex.CacheRead)
+	assert.Equal(t, r("gpt-5.5-cyber"), r("gpt-5.5-cyber-preview"))
+	cyber := r("gpt-6-cyber")
+	require.NotNil(t, cyber.LongPrompt)
+	assert.Equal(t, Rates{Input: 40, CacheRead: 4, CacheWrite5m: 40, CacheWrite1h: 40, Output: 150}, *cyber.LongPrompt)
 	_, ok := Lookup("text-embedding-3-small")
 	assert.False(t, ok, "embeddings are not chat models")
 }
